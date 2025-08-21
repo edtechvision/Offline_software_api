@@ -21,7 +21,7 @@ const login = async (req, res) => {
     } else {
       // Otherwise, try center login by centerCode
       user = await Center.findOne({ centerCode: identifier });
-      role = "staff";
+      role = "incharge";
     }
 
     if (!user) {
