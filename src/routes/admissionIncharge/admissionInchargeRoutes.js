@@ -3,6 +3,6 @@ const { createAdmissionIncharge } = require("../../controllers/AdmissionIncharge
 
 const router = express.Router();
 
-router.post("/create", createAdmissionIncharge);
+router.post("/admissionIncharge/create", createAdmissionIncharge);
 
 module.exports = router;

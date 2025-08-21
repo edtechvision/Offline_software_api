@@ -30,6 +30,7 @@ const createAdmissionIncharge = async (req, res) => {
     }
 
     const newIncharge = new AdmissionIncharge({
+      incharge_code:'TBINC' + Math.floor(10000 + Math.random() * 90000),
       incharge_name,
       email,
       mobile_number,

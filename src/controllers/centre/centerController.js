@@ -55,12 +55,46 @@ exports.createCenter = async (req, res) => {
 // Get all centers
 exports.getCenters = async (req, res) => {
   try {
-    const centers = await Center.find();
-    res.status(200).json({ success: true, data: centers });
+    let { page = 1, limit = 10, search = "" } = req.query;
+
+    page = parseInt(page);
+    limit = parseInt(limit);
+
+    // Search filter
+    const searchFilter = search
+      ? {
+          $or: [
+            { centerName: { $regex: search, $options: "i" } },
+            { centerHeadName: { $regex: search, $options: "i" } },
+            { email: { $regex: search, $options: "i" } },
+            { centerHeadMobileNo: { $regex: search, $options: "i" } },
+            { centerCode: { $regex: search, $options: "i" } },
+          ],
+        }
+      : {};
+
+    const total = await Center.countDocuments(searchFilter);
+
+    const centers = await Center.find(searchFilter)
+      .skip((page - 1) * limit)
+      .limit(limit)
+      .sort({ createdAt: -1 });
+
+    res.status(200).json({
+      success: true,
+      data: centers,
+      pagination: {
+        total,
+        page,
+        limit,
+        totalPages: Math.ceil(total / limit),
+      },
+    });
   } catch (error) {
     res.status(500).json({ success: false, message: error.message });
   }
 };
+
 
 // Get single center by ID
 exports.getCenterById = async (req, res) => {
