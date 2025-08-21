@@ -57,7 +57,7 @@ const jwt = require("jsonwebtoken");
 
 
 // Login as Admin
-exports.loginAdmin = async (req, res) => {
+const  loginAdmin = async (req, res) => {
   try {
     const { email, password } = req.body;
 
@@ -92,7 +92,7 @@ exports.loginAdmin = async (req, res) => {
 };
 
 // Login as Incharge
-exports.loginIncharge = async (req, res) => {
+const loginIncharge = async (req, res) => {
   try {
     const { centerCode, password } = req.body;
 
