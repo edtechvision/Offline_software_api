@@ -13,6 +13,9 @@ exports.createCenter = async (req, res) => {
       password
     } = req.body;
 
+
+     // keep plain password
+    const plainPassword = password;
     // Check if email already exists
     const existingCenter = await Center.findOne({ email });
     if (existingCenter) {
@@ -30,7 +33,8 @@ exports.createCenter = async (req, res) => {
       fullAddress,
       state,
       district,
-      password
+      password,
+      plainPassword
     });
 
     await newCenter.save();

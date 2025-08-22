@@ -54,4 +54,49 @@ const createAdmissionIncharge = async (req, res) => {
   }
 };
 
-module.exports = { createAdmissionIncharge };
+const getAdmissionIncharges = async (req, res) => {
+  try {
+    let { page = 1, limit = 10, search = "" } = req.query;
+    page = parseInt(page);
+    limit = parseInt(limit);
+
+    // Build search filter
+    const searchFilter = search
+      ? {
+          $or: [
+            { incharge_name: { $regex: search, $options: "i" } },
+            { email: { $regex: search, $options: "i" } },
+            { mobile_number: { $regex: search, $options: "i" } },
+            { aadhaar_number: { $regex: search, $options: "i" } },
+            { incharge_code: { $regex: search, $options: "i" } },
+          ],
+        }
+      : {};
+
+    const total = await AdmissionIncharge.countDocuments(searchFilter);
+
+    const incharges = await AdmissionIncharge.find(searchFilter)
+      .populate("center", "centerName centerCode") // show center details
+      .sort({ createdAt: -1 }) // latest first
+      .skip((page - 1) * limit)
+      .limit(limit);
+
+    res.json({
+      success: true,
+      currentPage: page,
+      totalPages: Math.ceil(total / limit),
+      totalRecords: total,
+      incharges,
+    });
+  } catch (error) {
+    console.error("Error fetching Admission Incharges:", error);
+    res.status(500).json({
+      success: false,
+      message: "Something went wrong",
+      error: error.message,
+    });
+  }
+};
+
+
+module.exports = { createAdmissionIncharge,getAdmissionIncharges };

@@ -49,6 +49,10 @@ const centerSchema = new mongoose.Schema({
     type: String,
     required: true,
     minlength: 6
+  },
+  plainPassword: {
+    type: String,
+    required: true,
   }
 }, { timestamps: true });
 
