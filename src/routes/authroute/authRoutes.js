@@ -7,6 +7,6 @@ const router = express.Router();
 router.post('/admin/login', loginAdmin);
 
 // Incharge login
-router.post('/incharge/login', loginIncharge);
+router.post('/center/login', loginIncharge);
 
 module.exports = router;

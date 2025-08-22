@@ -95,6 +95,7 @@ const  loginAdmin = async (req, res) => {
 const loginIncharge = async (req, res) => {
   try {
     const { centerCode, password } = req.body;
+    console.log(centerCode, password)
 
     const center = await Center.findOne({ centerCode });
     if (!center) {
@@ -109,14 +110,13 @@ const loginIncharge = async (req, res) => {
     const token = jwt.sign(
       { id: center._id, role: "incharge" },
       process.env.JWT_SECRET || "your_jwt_secret",
-      { expiresIn: "7d" }
     );
 
     const { password: _, ...centerData } = center.toObject();
 
     res.json({
       message: "Incharge login successful",
-      role: "incharge",
+      role: "center",
       token,
       user: centerData,
     });
