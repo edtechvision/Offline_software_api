@@ -98,5 +98,35 @@ const getAdmissionIncharges = async (req, res) => {
   }
 };
 
+const checkAdmissionIncharge = async (req, res) => {
+  try {
+    const { incharge_code } = req.body;
 
-module.exports = { createAdmissionIncharge,getAdmissionIncharges };
+    if (!incharge_code) {
+      return res.status(400).json({ message: "incharge_code is required" });
+    }
+
+    const incharge = await AdmissionIncharge.findOne({ incharge_code });
+
+    if (!incharge) {
+      return res.status(200).json({
+        exists: false,
+        message: "No Admission Incharge found with this code",
+      });
+    }
+
+    return res.status(200).json({
+      exists: true,
+      incharge_name: incharge.incharge_name,
+      incharge_code: incharge.incharge_code,
+      email: incharge.email,
+    });
+  } catch (error) {
+    console.error("Error checking Admission Incharge:", error);
+    res.status(500).json({
+      message: "Something went wrong",
+      error: error.message,
+    });
+  }
+};
+module.exports = { createAdmissionIncharge,getAdmissionIncharges,checkAdmissionIncharge };

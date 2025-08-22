@@ -4,6 +4,10 @@ const adminRoute = require("../routes/admin/adminRoutes");
 const authRoute = require("../routes/authroute/authRoutes");
 const centerRoute = require("../routes/centre/centerRoutes");
 const admissionInchargeRoute = require("../routes/admissionIncharge/admissionInchargeRoutes");
+const batchRoute = require("../routes/batch/batchRoutes");
+const courseRoute = require("../routes/course/courseRoutes");
+
+const studentRoute = require("../routes/student/studentRoute");
 
 
 
@@ -15,6 +19,9 @@ router.use("/api/v1", adminRoute);
 router.use("/api/v1", authRoute);
 router.use("/api/v1", centerRoute);
 router.use("/api/v1", admissionInchargeRoute);
+router.use("/api/v1", studentRoute);
+router.use("/api/v1", batchRoute);
+router.use("/api/v1", courseRoute);
 
 
 

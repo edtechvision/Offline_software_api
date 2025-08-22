@@ -19,13 +19,7 @@ const CourseSchema = new mongoose.Schema(
       type: Number,
       required: true,
       min: [0, 'EMI fee cannot be negative'],
-      validate: {
-        validator: function (v) {
-          // Optional: EMI should not exceed fee
-          return v <= this.fee;
-        },
-        message: 'EMI fee cannot be greater than total fee',
-      },
+    
     },
     serialNumber: {
       type: Number,

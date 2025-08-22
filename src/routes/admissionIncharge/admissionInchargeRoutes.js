@@ -1,9 +1,10 @@
 const express = require("express");
-const { createAdmissionIncharge,getAdmissionIncharges } = require("../../controllers/AdmissionIncharge/admissionInchargeController");
+const { createAdmissionIncharge,getAdmissionIncharges,checkAdmissionIncharge } = require("../../controllers/AdmissionIncharge/admissionInchargeController");
 
 const router = express.Router();
 
 router.post("/admissionIncharge/create", createAdmissionIncharge);
-router.post("/admissionIncharge/get", getAdmissionIncharges);
+router.get("/admissionIncharge/get", getAdmissionIncharges);
+router.post("/check-admissionIncharge", checkAdmissionIncharge);
 
 module.exports = router;
