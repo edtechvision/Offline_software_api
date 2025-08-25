@@ -12,6 +12,8 @@ const courseSchema = new mongoose.Schema({
       courseId: { type: mongoose.Schema.Types.ObjectId, ref: "Course" },
     additionalCourseId: { type: mongoose.Schema.Types.ObjectId, ref: "Course" },
   paymentType: { type: String, required: true },
+  downPayment:{ type: Number, required: true },
+  nextPaymentDueDate:{ type: Date, required: true },
   courseFee: { type: Number, required: true },
     batchId: { type: mongoose.Schema.Types.ObjectId, ref: "Batch" },
   session: { type: String, required: true },
