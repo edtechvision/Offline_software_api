@@ -117,6 +117,70 @@ exports.getAllBatches = async (req, res) => {
   }
 };
 
+// For staff: Only active batches
+exports.getAllActiveBatchesForStaff = async (req, res) => {
+  try {
+    const {
+      page = 1,
+      limit = 10,
+      search = '',
+      sortBy = 'createdAt',
+      sortOrder = 'desc'
+    } = req.query;
+
+    const pageNum = parseInt(page);
+    const limitNum = parseInt(limit);
+    const skip = (pageNum - 1) * limitNum;
+
+    // Build query: force only active
+    const query = { isActive: true };
+
+    // Search filter
+    if (search) {
+      query.batchName = { $regex: search, $options: 'i' };
+    }
+
+    // Sorting
+    const sortOptions = {};
+    sortOptions[sortBy] = sortOrder === 'desc' ? -1 : 1;
+
+    // Fetch data
+    const batches = await Batch.find(query)
+      .sort(sortOptions)
+      .skip(skip)
+      .limit(limitNum)
+      .select('-__v');
+
+    // Count
+    const totalBatches = await Batch.countDocuments(query);
+    const totalPages = Math.ceil(totalBatches / limitNum);
+
+    res.status(200).json({
+      success: true,
+      message: 'Active batches retrieved successfully for staff',
+      data: {
+        batches,
+        pagination: {
+          currentPage: pageNum,
+          totalPages,
+          totalBatches,
+          hasNext: pageNum < totalPages,
+          hasPrev: pageNum > 1,
+          limit: limitNum
+        }
+      }
+    });
+
+  } catch (error) {
+    console.error('Error fetching active batches for staff:', error);
+    res.status(500).json({
+      success: false,
+      message: 'Internal server error'
+    });
+  }
+};
+
+
 // Get batch by ID
 exports.getBatchById = async (req, res) => {
   try {

@@ -39,6 +39,33 @@ exports.getCourses = async (req, res) => {
   }
 };
 
+
+// Get only active courses (staff)
+exports.getActiveCoursesForStaff = async (req, res) => {
+  try {
+    const page = Math.max(parseInt(req.query.page) || 1, 1);
+    const limit = Math.min(parseInt(req.query.limit) || 20, 100);
+    const sort = req.query.sort || 'serialNumber'; // e.g. ?sort=-createdAt
+
+    const query = { isActive: true };
+
+    const [items, total] = await Promise.all([
+      Course.find(query).sort(sort).skip((page - 1) * limit).limit(limit),
+      Course.countDocuments(query),
+    ]);
+
+    res.json({
+      items,
+      page,
+      limit,
+      total,
+      pages: Math.ceil(total / limit),
+    });
+  } catch (err) {
+    res.status(500).json({ message: err.message });
+  }
+};
+
 // Read one
 exports.getCourseById = async (req, res) => {
   try {

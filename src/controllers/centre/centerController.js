@@ -211,3 +211,49 @@ exports.toggleBlockCenter = async (req, res) => {
   }
 };
 
+exports.getCentersByStaff = async (req, res) => {
+  try {
+    let { page = 1, limit = 10, search = "" } = req.query;
+
+    page = parseInt(page);
+    limit = parseInt(limit);
+
+    // Search filter
+    const searchFilter = search
+      ? {
+          $and: [
+            { isBlocked: false }, // only unblocked centers for staff
+            {
+              $or: [
+                { centerName: { $regex: search, $options: "i" } },
+                { centerHeadName: { $regex: search, $options: "i" } },
+                { email: { $regex: search, $options: "i" } },
+                { centerHeadMobileNo: { $regex: search, $options: "i" } },
+                { centerCode: { $regex: search, $options: "i" } },
+              ],
+            },
+          ],
+        }
+      : { isBlocked: false }; // if no search, still only return non-blocked centers
+
+    const total = await Center.countDocuments(searchFilter);
+
+    const centers = await Center.find(searchFilter)
+      .skip((page - 1) * limit)
+      .limit(limit)
+      .sort({ createdAt: -1 });
+
+    res.status(200).json({
+      success: true,
+      data: centers,
+      pagination: {
+        total,
+        page,
+        limit,
+        totalPages: Math.ceil(total / limit),
+      },
+    });
+  } catch (error) {
+    res.status(500).json({ success: false, message: error.message });
+  }
+};
