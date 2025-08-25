@@ -41,6 +41,10 @@ const AdmissionInchargeSchema = new mongoose.Schema(
       ref: "Center", // reference to Center model
       required: true,
     },
+      isBlocked: {
+    type: Boolean,
+    default: false
+  }
   },
   { timestamps: true }
 );

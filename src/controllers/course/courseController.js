@@ -51,18 +51,24 @@ exports.getCourseById = async (req, res) => {
 };
 
 // Update
+
+// Update course
 exports.updateCourse = async (req, res) => {
   try {
-    const updates = (({ name, fee, emiFee, serialNumber }) => ({ name, fee, emiFee, serialNumber }))(req.body);
-    Object.keys(updates).forEach((k) => updates[k] === undefined && delete updates[k]);
+    const { courseId } = req.params;
+    const updates = req.body; // name, fee, emiFee, serialNumber, isActive etc.
 
     const course = await Course.findByIdAndUpdate(
-      req.params.id,
+      courseId,
       updates,
       { new: true, runValidators: true }
     );
-    if (!course) return res.status(404).json({ message: 'Course not found' });
-    res.json(course);
+
+    if (!course) {
+      return res.status(404).json({ message: "Course not found" });
+    }
+
+    res.status(200).json(course);
   } catch (err) {
     if (err.code === 11000) {
       return res.status(409).json({ message: 'serialNumber must be unique' });
@@ -79,5 +85,31 @@ exports.deleteCourse = async (req, res) => {
     res.json({ message: 'Course deleted' });
   } catch (err) {
     res.status(400).json({ message: 'Invalid ID' });
+  }
+};
+
+
+// Toggle Course active/inactive
+exports.toggleCourseActive = async (req, res) => {
+  try {
+    const { courseId } = req.params;
+    const { active } = req.body; // true or false
+
+    const course = await Course.findByIdAndUpdate(
+      courseId,
+      { isActive: active },
+      { new: true }
+    );
+
+    if (!course) {
+      return res.status(404).json({ message: "Course not found" });
+    }
+
+    res.status(200).json({
+      message: `Course ${active ? "activated" : "deactivated"} successfully`,
+      course
+    });
+  } catch (error) {
+    res.status(500).json({ message: "Server error", error: error.message });
   }
 };

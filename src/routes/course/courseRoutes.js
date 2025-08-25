@@ -7,7 +7,11 @@ const ctrl = require('../../controllers/course/courseController');
 router.post('/courses', ctrl.createCourse);
 router.get('/courses', ctrl.getCourses);
 router.get('/courses/:id', ctrl.getCourseById);
-router.patch('/courses/:id', ctrl.updateCourse);
+router.get('/courses/incharge', ctrl.getActiveCoursesForStaff);
+
+router.put('/courses/:courseId', ctrl.updateCourse);
+
 router.delete('/courses/:id', ctrl.deleteCourse);
+router.post('/courses/:courseId/active', ctrl.toggleCourseActive);
 
 module.exports = router;

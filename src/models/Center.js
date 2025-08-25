@@ -53,6 +53,10 @@ const centerSchema = new mongoose.Schema({
   plainPassword: {
     type: String,
     required: true,
+  },
+   isBlocked: {
+    type: Boolean,
+    default: false
   }
 }, { timestamps: true });
 

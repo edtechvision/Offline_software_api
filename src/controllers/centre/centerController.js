@@ -114,16 +114,66 @@ exports.getCenterById = async (req, res) => {
 // Update center
 exports.updateCenter = async (req, res) => {
   try {
-    const center = await Center.findByIdAndUpdate(req.params.id, req.body, {
-      new: true,
-      runValidators: true,
+    const { id } = req.params; // Center ID from route
+    const {
+      centerName,
+      centerHeadName,
+      email,
+      centerHeadMobileNo,
+      fullAddress,
+      state,
+      district,
+      password
+    } = req.body;
+
+    // Find center
+    const center = await Center.findById(id);
+    if (!center) {
+      return res.status(404).json({ message: 'Center not found' });
+    }
+
+    // If email is being updated, check uniqueness
+    if (email && email !== center.email) {
+      const existingCenter = await Center.findOne({ email });
+      if (existingCenter) {
+        return res.status(400).json({ message: 'Email already registered with another center' });
+      }
+      center.email = email;
+    }
+
+    // Update fields if provided
+    if (centerName) center.centerName = centerName;
+    if (centerHeadName) center.centerHeadName = centerHeadName;
+    if (centerHeadMobileNo) center.centerHeadMobileNo = centerHeadMobileNo;
+    if (fullAddress) center.fullAddress = fullAddress;
+    if (state) center.state = state;
+    if (district) center.district = district;
+
+    // Update password if provided
+    if (password) {
+      center.password = password;
+      center.plainPassword = password; // keep plain version like in create
+    }
+
+    const updatedCenter = await center.save();
+
+    // Remove password from response
+    const { password: _, plainPassword, ...centerData } = updatedCenter.toObject();
+
+    res.status(200).json({
+      message: 'Center updated successfully',
+      center: centerData
     });
-    if (!center) return res.status(404).json({ success: false, message: "Center not found" });
-    res.status(200).json({ success: true, data: center });
+
   } catch (error) {
-    res.status(400).json({ success: false, message: error.message });
+    console.error('Error updating center:', error);
+    res.status(500).json({
+      message: 'Something went wrong',
+      error: error.message
+    });
   }
 };
+
 
 // Delete center
 exports.deleteCenter = async (req, res) => {
@@ -135,3 +185,29 @@ exports.deleteCenter = async (req, res) => {
     res.status(500).json({ success: false, message: error.message });
   }
 };
+
+// Block/Unblock a center
+exports.toggleBlockCenter = async (req, res) => {
+  try {
+    const { centerId } = req.params;
+    const { block } = req.body; // true or false
+
+    const center = await Center.findByIdAndUpdate(
+      centerId,
+      { isBlocked: block },
+      { new: true }
+    );
+
+    if (!center) {
+      return res.status(404).json({ message: "Center not found" });
+    }
+
+    res.status(200).json({
+      message: `Center ${block ? "blocked" : "unblocked"} successfully`,
+      center
+    });
+  } catch (error) {
+    res.status(500).json({ message: "Server error", error: error.message });
+  }
+};
+

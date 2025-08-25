@@ -28,6 +28,10 @@ const CourseSchema = new mongoose.Schema(
       index: true,
       min: 1,
     },
+      isActive: {
+      type: Boolean,
+      default: true,
+    },
   },
   { timestamps: true }
 );

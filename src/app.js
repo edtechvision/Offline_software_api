@@ -11,7 +11,34 @@ app.use(express.json({ limit: "50mb" }));
 app.use(express.urlencoded({ limit: "50mb", extended: true }));
 app.use('/uploads', express.static('uploads'));
 
+async function addBlockField() {
+
+  await Center.updateMany(
+    { isBlocked: { $exists: false } },  // only update docs without field
+    { $set: { isBlocked: false } }
+  );
+
+  console.log("✅ Added isBlocked field to all existing centers.");
+  mongoose.disconnect();
+}
+
+addBlockField();
+
+async function addIsActiveField() {
+
+  await Course.updateMany(
+    { isActive: { $exists: false } }, // only if missing
+    { $set: { isActive: true } }
+  );
+
+  console.log("✅ Added isActive field to all existing courses.");
+  mongoose.disconnect();
+}
+
+addIsActiveField();
 const routes = require("./routes/index");
+const Center = require("./models/Center");
+const Course = require("./models/Course");
 app.use(routes);
 
 // updateOldTemplates();

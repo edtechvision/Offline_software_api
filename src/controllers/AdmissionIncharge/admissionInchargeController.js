@@ -129,4 +129,82 @@ const checkAdmissionIncharge = async (req, res) => {
     });
   }
 };
-module.exports = { createAdmissionIncharge,getAdmissionIncharges,checkAdmissionIncharge };
+
+const toggleAdmissionIncharge = async (req, res) => {
+  try {
+    const { id } = req.params;
+    const { block } = req.body; // true or false
+
+    const center = await AdmissionIncharge.findByIdAndUpdate(
+      id,
+      { isBlocked: block },
+      { new: true }
+    );
+
+    if (!center) {
+      return res.status(404).json({ message: "AdmissionIncharge not found" });
+    }
+
+    res.status(200).json({
+      message: `AdmissionIncharge ${block ? "blocked" : "unblocked"} successfully`,
+      center
+    });
+  } catch (error) {
+    res.status(500).json({ message: "Server error", error: error.message });
+  }
+};
+
+
+// Update Admission Incharge
+const updateAdmissionIncharge = async (req, res) => {
+  try {
+    const { inchargeId } = req.params;
+    const updates = req.body; // fields to update
+
+    // If "center" is being updated, validate it
+    if (updates.center) {
+      const existingCenter = await Center.findById(updates.center);
+      if (!existingCenter) {
+        return res.status(404).json({ message: "Center not found" });
+      }
+    }
+
+    // Prevent duplicates (email, aadhaar, mobile) if updated
+    if (updates.email || updates.aadhaar_number || updates.mobile_number) {
+      const conflict = await AdmissionIncharge.findOne({
+        _id: { $ne: inchargeId }, // exclude current record
+        $or: [
+          updates.email ? { email: updates.email } : {},
+          updates.aadhaar_number ? { aadhaar_number: updates.aadhaar_number } : {},
+          updates.mobile_number ? { mobile_number: updates.mobile_number } : {}
+        ]
+      });
+
+      if (conflict) {
+        return res.status(400).json({ message: "Another Incharge exists with same email, Aadhaar, or mobile number" });
+      }
+    }
+
+    const updatedIncharge = await AdmissionIncharge.findByIdAndUpdate(
+      inchargeId,
+      updates,
+      { new: true, runValidators: true }
+    );
+
+    if (!updatedIncharge) {
+      return res.status(404).json({ message: "Admission Incharge not found" });
+    }
+
+    res.status(200).json({
+      message: "Admission Incharge updated successfully",
+      admissionIncharge: updatedIncharge,
+    });
+  } catch (error) {
+    console.error("Error updating Admission Incharge:", error);
+    res.status(500).json({
+      message: "Something went wrong",
+      error: error.message,
+    });
+  }
+};
+module.exports = { createAdmissionIncharge,getAdmissionIncharges,checkAdmissionIncharge,toggleAdmissionIncharge,updateAdmissionIncharge };

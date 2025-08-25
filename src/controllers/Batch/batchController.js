@@ -156,17 +156,20 @@ exports.getBatchById = async (req, res) => {
 };
 
 // Update batch
-exports.updateBatch = async (req, res) => {
+exports.updateBatchName = async (req, res) => {
   try {
     const { id } = req.params;
-    const updateData = req.body;
+    const { batchName } = req.body;
 
-    const batch = await Batch.findByIdAndUpdate(
-      id,
-      updateData,
-      { new: true, runValidators: true }
-    ).select('-__v');
+    if (!batchName) {
+      return res.status(400).json({
+        success: false,
+        message: 'Batch name is required'
+      });
+    }
 
+    // Check if batch exists
+    const batch = await Batch.findById(id);
     if (!batch) {
       return res.status(404).json({
         success: false,
@@ -174,31 +177,26 @@ exports.updateBatch = async (req, res) => {
       });
     }
 
+    // Check if new batchName already exists
+    const existingBatch = await Batch.findOne({ batchName });
+    if (existingBatch) {
+      return res.status(400).json({
+        success: false,
+        message: 'Batch name already exists'
+      });
+    }
+
+    batch.batchName = batchName;
+    const updatedBatch = await batch.save();
+
     res.status(200).json({
       success: true,
-      message: 'Batch updated successfully',
-      data: batch
+      message: 'Batch name updated successfully',
+      data: updatedBatch
     });
 
   } catch (error) {
-    console.error('Error updating batch:', error);
-    
-    if (error.name === 'CastError') {
-      return res.status(400).json({
-        success: false,
-        message: 'Invalid batch ID'
-      });
-    }
-
-    if (error.name === 'ValidationError') {
-      const errors = Object.values(error.errors).map(err => err.message);
-      return res.status(400).json({
-        success: false,
-        message: 'Validation failed',
-        errors: errors
-      });
-    }
-
+    console.error('Error updating batch name:', error);
     res.status(500).json({
       success: false,
       message: 'Internal server error'
@@ -206,10 +204,20 @@ exports.updateBatch = async (req, res) => {
   }
 };
 
+
+
 // Toggle batch active status
-exports.toggleBatchStatus = async (req, res) => {
+exports.updateBatchStatus = async (req, res) => {
   try {
     const { id } = req.params;
+    const { isActive } = req.body;
+
+    if (typeof isActive === 'undefined') {
+      return res.status(400).json({
+        success: false,
+        message: 'isActive field is required'
+      });
+    }
 
     const batch = await Batch.findById(id);
     if (!batch) {
@@ -219,32 +227,24 @@ exports.toggleBatchStatus = async (req, res) => {
       });
     }
 
-    // Toggle the status
-    batch.isActive = !batch.isActive;
+    batch.isActive = isActive;
     const updatedBatch = await batch.save();
 
     res.status(200).json({
       success: true,
-      message: `Batch ${updatedBatch.isActive ? 'activated' : 'deactivated'} successfully`,
+      message: 'Batch status updated successfully',
       data: updatedBatch
     });
 
   } catch (error) {
-    console.error('Error toggling batch status:', error);
-    
-    if (error.name === 'CastError') {
-      return res.status(400).json({
-        success: false,
-        message: 'Invalid batch ID'
-      });
-    }
-
+    console.error('Error updating batch status:', error);
     res.status(500).json({
       success: false,
       message: 'Internal server error'
     });
   }
 };
+
 
 // Delete batch
 exports.deleteBatch = async (req, res) => {
