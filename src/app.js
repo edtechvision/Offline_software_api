@@ -10,6 +10,9 @@ app.use(cors());
 app.use(express.json({ limit: "50mb" }));
 app.use(express.urlencoded({ limit: "50mb", extended: true }));
 app.use('/uploads', express.static('uploads'));
+const Center = require("./models/Center");
+const Course = require("./models/Course");
+const mongoose = require("mongoose");
 
 async function addBlockField() {
 
@@ -19,10 +22,10 @@ async function addBlockField() {
   );
 
   console.log("✅ Added isBlocked field to all existing centers.");
-  mongoose.disconnect();
+  // mongoose.disconnect();
 }
 
-addBlockField();
+// addBlockField();
 
 async function addIsActiveField() {
 
@@ -32,13 +35,11 @@ async function addIsActiveField() {
   );
 
   console.log("✅ Added isActive field to all existing courses.");
-  mongoose.disconnect();
+  // mongoose.disconnect();
 }
 
-addIsActiveField();
+// addIsActiveField();
 const routes = require("./routes/index");
-const Center = require("./models/Center");
-const Course = require("./models/Course");
 app.use(routes);
 
 // updateOldTemplates();
