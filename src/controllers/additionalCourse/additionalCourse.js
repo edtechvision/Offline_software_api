@@ -4,8 +4,8 @@ const AdditionalCourse = require('../../models/AdditionalCourse');
 // Create
 exports.createAdditionalCourse = async (req, res) => {
   try {
-    const { name, fee, emiFee, serialNumber } = req.body;
-    const course = await AdditionalCourse.create({ name, fee, emiFee, serialNumber });
+    const { name, serialNumber } = req.body;
+    const course = await AdditionalCourse.create({ name, serialNumber });
     res.status(201).json(course);
   } catch (err) {
     if (err.code === 11000) {
@@ -39,19 +39,21 @@ exports.getAdditionalCourse = async (req, res) => {
   }
 };
 
-
-// Get only active courses (staff)
-exports.getActiveAdditionalCourseForStaff = async (req, res) => {
+exports.getAdditionalCourseByIncharge = async (req, res) => {
   try {
     const page = Math.max(parseInt(req.query.page) || 1, 1);
     const limit = Math.min(parseInt(req.query.limit) || 20, 100);
     const sort = req.query.sort || 'serialNumber'; // e.g. ?sort=-createdAt
 
-    const query = { isActive: true };
+
+    const filter = {  isActive: true };
 
     const [items, total] = await Promise.all([
-      AdditionalCourse.find(query).sort(sort).skip((page - 1) * limit).limit(limit),
-      AdditionalCourse.countDocuments(query),
+      AdditionalCourse.find(filter)
+        .sort(sort)
+        .skip((page - 1) * limit)
+        .limit(limit),
+      AdditionalCourse.countDocuments(filter),
     ]);
 
     res.json({
@@ -65,6 +67,10 @@ exports.getActiveAdditionalCourseForStaff = async (req, res) => {
     res.status(500).json({ message: err.message });
   }
 };
+
+
+
+
 
 // Read one
 exports.getAdditionalCourseById = async (req, res) => {
@@ -119,11 +125,11 @@ exports.deleteAdditionalCourse = async (req, res) => {
 // Toggle Course active/inactive
 exports.toggleCourseActive = async (req, res) => {
   try {
-    const { courseId } = req.params;
+    const { id } = req.params;
     const { active } = req.body; // true or false
 
-    const course = await Course.findByIdAndUpdate(
-      courseId,
+    const course = await AdditionalCourse.findByIdAndUpdate(
+      id,
       { isActive: active },
       { new: true }
     );

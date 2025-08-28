@@ -7,9 +7,9 @@ const ctrl = require('../../controllers/additionalCourse/additionalCourse');
 router.post('/additional-courses', ctrl.createAdditionalCourse);
 router.get('/additional-courses', ctrl.getAdditionalCourse);
 router.get('/additional-courses/:id', ctrl.getAdditionalCourseById);
-router.get('/additional-courses/incharge', ctrl.getActiveAdditionalCourseForStaff);
+router.get('/additional-courses-incharge', ctrl.getAdditionalCourseByIncharge);
 
-router.put('/additional-courses/:courseId', ctrl.updateAdditionalCourse);
+router.put('/additional-courses-byId/:id', ctrl.updateAdditionalCourse);
 
 router.delete('/additional-courses/:id', ctrl.deleteAdditionalCourse);
 router.post('/additional-courses/:courseId/active', ctrl.toggleCourseActive);

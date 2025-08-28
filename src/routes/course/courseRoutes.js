@@ -7,7 +7,7 @@ const ctrl = require('../../controllers/course/courseController');
 router.post('/courses', ctrl.createCourse);
 router.get('/courses', ctrl.getCourses);
 router.get('/courses/:id', ctrl.getCourseById);
-router.get('/courses/incharge', ctrl.getActiveCoursesForStaff);
+router.get('/courses-incharge', ctrl.getActiveCoursesForStaff);
 
 router.put('/courses/:courseId', ctrl.updateCourse);
 
