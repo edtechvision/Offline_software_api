@@ -8,6 +8,7 @@ const batchRoute = require("../routes/batch/batchRoutes");
 const courseRoute = require("../routes/course/courseRoutes");
 
 const studentRoute = require("../routes/student/studentRoute");
+const additionalCourseRoute = require("../routes/additionalCourse/additionalCourse");
 
 
 
@@ -22,6 +23,7 @@ router.use("/api/v1", admissionInchargeRoute);
 router.use("/api/v1", studentRoute);
 router.use("/api/v1", batchRoute);
 router.use("/api/v1", courseRoute);
+router.use("/api/v1", additionalCourseRoute);
 
 
 
