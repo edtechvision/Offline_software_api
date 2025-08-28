@@ -599,3 +599,36 @@ exports.getStudents = async (req, res) => {
     });
   }
 };
+
+exports.getStudentById = async (req, res) => {
+  try {
+    const { id } = req.params;
+
+    // Find student by ID and populate related fields
+    const student = await Student.findById(id)
+      .select('-__v')
+      .populate("courseDetails.courseId", "name fee")
+      .populate("courseDetails.additionalCourseId", "name fee")
+      .populate("courseDetails.batchId", "batchName");
+
+    if (!student) {
+      return res.status(404).json({
+        success: false,
+        message: 'Student not found'
+      });
+    }
+
+    res.status(200).json({
+      success: true,
+      message: 'Student retrieved successfully',
+      data: student
+    });
+
+  } catch (error) {
+    console.error('Error fetching student by ID:', error);
+    res.status(500).json({
+      success: false,
+      message: 'Internal server error'
+    });
+  }
+};

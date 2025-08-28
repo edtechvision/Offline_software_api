@@ -7,6 +7,8 @@ const ctrl = require('../../controllers/student/student');
 router.post('/student', ctrl.createStudent);
 router.get('/student/:id', ctrl.updateStudent);
 router.get('/students', ctrl.getStudents);
+router.get('/students/:id', ctrl.getStudentById);
+
 
 
 module.exports = router;
