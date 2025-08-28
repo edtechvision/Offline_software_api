@@ -22,6 +22,8 @@ const courseSchema = new mongoose.Schema({
     required: true,
     enum: ['UPI', 'Cash', 'Card', 'Net Banking']
   },
+    transactionId: { type: String }, // ✅ Added transactionId for UPI payments
+
   image: { type: String }, // Path to uploaded image
   referenceNumber: { type: String }
 });
@@ -51,6 +53,8 @@ const studentSchema = new mongoose.Schema({
   isPermanentSameAsPresent: { type: Boolean, default: false },
   collegeName: { type: String, required: true },
   className: { type: String, required: true },
+    image: { type: String }, // ✅ Moved here (student’s photo)
+
   courseDetails: { type: courseSchema, required: true },
   createdAt: { type: Date, default: Date.now },
   updatedAt: { type: Date, default: Date.now }

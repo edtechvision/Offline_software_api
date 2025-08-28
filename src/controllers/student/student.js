@@ -275,15 +275,14 @@ exports.createStudent = async (req, res) => {
           studentData.permanentAddress = { ...studentData.presentAddress };
         }
         
-        // Add image URL if file was uploaded
-        if (req.file) {
-          studentData.courseDetails = studentData.courseDetails || {};
-          studentData.courseDetails.image = req.file.location; // S3 URL
-        }
+      if (req.file) {
+  studentData.image = req.file.location; // ✅ Save directly in student schema
+}
+
 
         // ✅ Extra validation for courseDetails
 if (studentData.courseDetails) {
-  const { paymentType, downPayment, nextPaymentDueDate } = studentData.courseDetails;
+  const { paymentType, downPayment, nextPaymentDueDate,paymentMode,transactionId } = studentData.courseDetails;
 
   if (paymentType === "EMI") {
     if (!downPayment || !nextPaymentDueDate) {
@@ -293,6 +292,16 @@ if (studentData.courseDetails) {
       });
     }
   }
+  
+  if (paymentMode === "UPI") {
+    if (!transactionId ) {
+      return res.status(400).json({
+        success: false,
+        message: "Transaction Id reuired"
+      });
+    }
+  }
+
 }
 
         // ✅ Generate Barcode from registrationNo
