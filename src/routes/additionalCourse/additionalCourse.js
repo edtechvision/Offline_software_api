@@ -12,6 +12,6 @@ router.get('/additional-courses-incharge', ctrl.getAdditionalCourseByIncharge);
 router.put('/additional-courses-byId/:id', ctrl.updateAdditionalCourse);
 
 router.delete('/additional-courses/:id', ctrl.deleteAdditionalCourse);
-router.post('/additional-courses/:courseId/active', ctrl.toggleCourseActive);
+router.post('/additional-courses/:id/active', ctrl.toggleCourseActive);
 
 module.exports = router;
