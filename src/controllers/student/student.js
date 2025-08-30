@@ -3,7 +3,8 @@ const multer = require('multer');
 const multerS3 = require('multer-s3');
 const Student = require('../../models/Student');
 const bwipjs = require('bwip-js');
-
+// ✅ Generate QR Code instead of Barcode
+const QRCode = require("qrcode");
 // Configure AWS S3
 const s3 = new AWS.S3({
   accessKeyId: process.env.DO_SPACE_KEY,
@@ -355,19 +356,38 @@ exports.createStudent = async (req, res) => {
           }
         }
 
-        // ✅ Generate Barcode
-        const barcodeBuffer = await bwipjs.toBuffer({
-          bcid: "code128",
-          text: studentData.registrationNo,
-          scale: 3,
-          height: 10,
-          includetext: true,
-          textxalign: "center",
-        });
+        // // ✅ Generate Barcode
+        // const barcodeBuffer = await bwipjs.toBuffer({
+        //   bcid: "code128",
+        //   text: studentData.registrationNo,
+        //   scale: 3,
+        //   height: 10,
+        //   includetext: true,
+        //   textxalign: "center",
+        // });
 
-        studentData.barcode = `data:image/png;base64,${barcodeBuffer.toString(
-          "base64"
-        )}`;
+        // studentData.barcode = `data:image/png;base64,${barcodeBuffer.toString(
+        //   "base64"
+        // )}`;
+
+        try {
+  const qrCodeData = await QRCode.toDataURL(studentData.registrationNo, {
+    errorCorrectionLevel: "H", // High error correction
+    type: "image/png",
+    width: 300,
+    margin: 2,
+  });
+
+  studentData.qrCode = qrCodeData; // save QR code as Base64 image
+  studentData.qrCodeData = studentData.registrationNo; // store raw data for verification
+
+} catch (qrErr) {
+  console.error("QR Code generation failed:", qrErr);
+  return res.status(500).json({
+    success: false,
+    message: "Failed to generate QR Code",
+  });
+}
 
         // ✅ Save student
         const student = new Student(studentData);

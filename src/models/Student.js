@@ -10,7 +10,7 @@ const addressSchema = new mongoose.Schema({
 
 const courseSchema = new mongoose.Schema({
       courseId: { type: mongoose.Schema.Types.ObjectId, ref: "Course" },
-    additionalCourseId: { type: mongoose.Schema.Types.ObjectId, ref: "Course" },
+    additionalCourseId: { type: mongoose.Schema.Types.ObjectId, ref: "AdditionalCourse" },
   paymentType: { type: String, required: true,enum: ['Full-payment', 'EMI'] },
   downPayment:{ type: Number, required: false },
   nextPaymentDueDate:{ type: Date, required: false },
@@ -32,7 +32,7 @@ const studentSchema = new mongoose.Schema({
   inchargeCode: { type: String, required: true },
   inchargeName: { type: String, required: true },
   studentName: { type: String, required: true },
-  barcode: { type: String, required: true },
+  qrCode: { type: String, required: true },
     registrationNo: { type: String, required: true },
   fathersName: { type: String, required: true },
   mothersName: { type: String, required: true },
