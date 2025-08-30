@@ -115,6 +115,15 @@ const checkAdmissionIncharge = async (req, res) => {
       });
     }
 
+    // ✅ Check if incharge is blocked
+    if (incharge.isBlocked) {
+      return res.status(403).json({
+        exists: true,
+        blocked: true,
+        message: "You are blocked",
+      });
+    }
+
     return res.status(200).json({
       exists: true,
       incharge_name: incharge.incharge_name,
@@ -129,6 +138,7 @@ const checkAdmissionIncharge = async (req, res) => {
     });
   }
 };
+
 
 const toggleAdmissionIncharge = async (req, res) => {
   try {
@@ -207,4 +217,31 @@ const updateAdmissionIncharge = async (req, res) => {
     });
   }
 };
-module.exports = { createAdmissionIncharge,getAdmissionIncharges,checkAdmissionIncharge,toggleAdmissionIncharge,updateAdmissionIncharge };
+
+const deleteAdmissionIncharge = async (req, res) => {
+  try {
+    const { id } = req.params; // expecting AdmissionIncharge _id in URL
+
+    // Check if incharge exists
+    const existingIncharge = await AdmissionIncharge.findById(id);
+    if (!existingIncharge) {
+      return res.status(404).json({ message: "Admission Incharge not found" });
+    }
+
+    // Delete incharge
+    await AdmissionIncharge.findByIdAndDelete(id);
+
+    res.status(200).json({
+      message: "Admission Incharge deleted successfully",
+      deletedIncharge: existingIncharge,
+    });
+  } catch (error) {
+    console.error("Error deleting Admission Incharge:", error);
+    res.status(500).json({
+      message: "Something went wrong",
+      error: error.message,
+    });
+  }
+};
+
+module.exports = { createAdmissionIncharge,getAdmissionIncharges,checkAdmissionIncharge,toggleAdmissionIncharge,updateAdmissionIncharge,deleteAdmissionIncharge };

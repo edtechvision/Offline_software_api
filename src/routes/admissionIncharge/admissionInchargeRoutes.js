@@ -1,5 +1,5 @@
 const express = require("express");
-const { createAdmissionIncharge,getAdmissionIncharges,checkAdmissionIncharge,toggleAdmissionIncharge ,updateAdmissionIncharge} = require("../../controllers/AdmissionIncharge/admissionInchargeController");
+const { createAdmissionIncharge,getAdmissionIncharges,checkAdmissionIncharge,toggleAdmissionIncharge ,updateAdmissionIncharge,deleteAdmissionIncharge} = require("../../controllers/AdmissionIncharge/admissionInchargeController");
 
 const router = express.Router();
 
@@ -8,6 +8,9 @@ router.get("/admissionIncharge/get", getAdmissionIncharges);
 router.post("/check-admissionIncharge", checkAdmissionIncharge);
 router.post('/admissionIncharge/block/:id', toggleAdmissionIncharge);
 router.put('/admissionIncharge/:inchargeId', updateAdmissionIncharge);
+
+router.delete("/admissionIncharge/:id", deleteAdmissionIncharge);
+
 
 
 module.exports = router;

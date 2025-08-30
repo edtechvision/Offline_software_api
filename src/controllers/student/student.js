@@ -366,251 +366,235 @@ exports.createStudent = async (req, res) => {
 
 exports.updateStudent = async (req, res) => {
   try {
-    // Handle file upload
-    upload(req, res, async function (err) {
-      if (err instanceof multer.MulterError) {
-        if (err.code === "LIMIT_FILE_SIZE") {
+    const { id } = req.params;
+    let studentData = req.body;
+
+    // ✅ Check if student exists
+    const existingStudent = await Student.findById(id);
+    if (!existingStudent) {
+      return res.status(404).json({
+        success: false,
+        message: "Student not found",
+      });
+    }
+
+    // ✅ Required fields validation (same as create)
+    const requiredFields = [
+      "inchargeCode",
+      "inchargeName",
+      "studentName",
+      "fathersName",
+      "mothersName",
+      "dateOfBirth",
+      "category",
+      "nationality",
+      "gender",
+      "email",
+      "mobileNumber",
+      "adharNumber",
+      "collegeName",
+      "className",
+    ];
+
+    const missingFields = requiredFields.filter(
+      (field) => !studentData[field] && !existingStudent[field]
+    );
+    if (missingFields.length > 0) {
+      return res.status(400).json({
+        success: false,
+        message: `Missing required fields: ${missingFields.join(", ")}`,
+      });
+    }
+
+    // ✅ Validate email
+    const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
+    if (studentData.email && !emailRegex.test(studentData.email)) {
+      return res.status(400).json({
+        success: false,
+        message: "Invalid email format",
+      });
+    }
+
+    // ✅ Parse JSON fields if string
+    const parseJSON = (field) => {
+      if (typeof studentData[field] === "string") {
+        try {
+          studentData[field] = JSON.parse(studentData[field]);
+        } catch {
           return res.status(400).json({
             success: false,
-            message: "File size too large. Maximum size is 5MB.",
+            message: `Invalid ${field} format`,
           });
         }
-        return res.status(400).json({
-          success: false,
-          message: `File upload error: ${err.message}`,
-        });
-      } else if (err) {
-        return res.status(400).json({
-          success: false,
-          message: err.message,
-        });
       }
+    };
+    parseJSON("presentAddress");
+    parseJSON("permanentAddress");
+    parseJSON("courseDetails");
+
+    if (studentData.isPermanentSameAsPresent) {
+      studentData.permanentAddress = { ...studentData.presentAddress };
+    }
+
+    // ✅ Upload image to S3 (replace old if new uploaded)
+    if (req.file) {
+      const fileName = `students/${uuidv4()}-${req.file.originalname}`;
+      const params = {
+        Bucket: "image-store",
+        Key: fileName,
+        Body: req.file.buffer,
+        ACL: "public-read",
+        ContentType: req.file.mimetype,
+      };
 
       try {
-        const { id } = req.params;
-        const studentData = req.body;
+        const uploadResult = await s3.upload(params).promise();
+        studentData.image = uploadResult.Location;
 
-        // ✅ Check if student exists
-        const existingStudent = await Student.findById(id);
-        if (!existingStudent) {
-          return res.status(404).json({
-            success: false,
-            message: "Student not found",
-          });
-        }
-
-        // ✅ Validate required fields
-        const requiredFields = [
-          "inchargeCode",
-          "inchargeName",
-          "studentName",
-          "fathersName",
-          "mothersName",
-          "dateOfBirth",
-          "category",
-          "nationality",
-          "gender",
-          "email",
-          "mobileNumber",
-          "adharNumber",
-          "collegeName",
-          "className",
-        ];
-
-        const missingFields = requiredFields.filter(
-          (field) => !studentData[field] && !existingStudent[field]
-        );
-        if (missingFields.length > 0) {
-          return res.status(400).json({
-            success: false,
-            message: `Missing required fields: ${missingFields.join(", ")}`,
-          });
-        }
-
-        // ✅ Validate email format
-        const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
-        if (studentData.email && !emailRegex.test(studentData.email)) {
-          return res.status(400).json({
-            success: false,
-            message: "Invalid email format",
-          });
-        }
-
-        // ✅ Parse nested objects if they are sent as strings
-        const parseJSON = (fieldName) => {
-          if (typeof studentData[fieldName] === "string") {
-            try {
-              studentData[fieldName] = JSON.parse(studentData[fieldName]);
-            } catch {
-              return res.status(400).json({
-                success: false,
-                message: `Invalid ${fieldName} format`,
-              });
-            }
-          }
-        };
-
-        parseJSON("presentAddress");
-        parseJSON("permanentAddress");
-        parseJSON("courseDetails");
-
-        // ✅ If permanent address same as present
-        if (studentData.isPermanentSameAsPresent) {
-          studentData.permanentAddress = { ...studentData.presentAddress };
-        }
-
-        // ✅ Handle image upload
-        if (req.file) {
-          studentData.image = req.file.location;
-
-          // Delete old image from S3 if it exists
-          if (existingStudent.image) {
-            try {
-              const oldImageKey = existingStudent.image.split("/").pop();
-              await s3
-                .deleteObject({
-                  Bucket: process.env.DO_SPACE_BUCKET,
-                  Key: `student-images/${oldImageKey}`,
-                })
-                .promise();
-            } catch (s3Error) {
-              console.error("Error deleting old image from S3:", s3Error);
-              // Continue with update even if old image deletion fails
-            }
+        // delete old image if exists
+        if (existingStudent.image) {
+          try {
+            const oldKey = existingStudent.image.split("/").slice(-2).join("/");
+            await s3
+              .deleteObject({ Bucket: "image-store", Key: oldKey })
+              .promise();
+          } catch (delErr) {
+            console.error("Failed to delete old image:", delErr);
           }
         }
-
-        // ✅ Extra validation for courseDetails
-        if (studentData.courseDetails) {
-          const {
-            paymentType,
-            downPayment,
-            nextPaymentDueDate,
-            paymentMode,
-            transactionId,
-          } = studentData.courseDetails;
-
-          if (paymentType === "EMI") {
-            if (!downPayment || !nextPaymentDueDate) {
-              return res.status(400).json({
-                success: false,
-                message:
-                  "For EMI payment type, downPayment and nextPaymentDueDate are required",
-              });
-            }
-          }
-
-          if (paymentMode === "UPI") {
-            if (!transactionId) {
-              return res.status(400).json({
-                success: false,
-                message: "Transaction Id required",
-              });
-            }
-          }
-        }
-
-        // ✅ Regenerate registrationNo if className is changed
-        if (
-          studentData.className &&
-          studentData.className !== existingStudent.className
-        ) {
-          const classMap = {
-            "9th": "09",
-            "10th": "10",
-            "11th": "11",
-            "12th": "12",
-          };
-
-          const classCode = classMap[studentData.className] || "00";
-          const yearCode = new Date().getFullYear().toString().slice(-2);
-
-          const lastStudent = await Student.findOne({
-            className: studentData.className,
-            registrationNo: { $regex: `^${classCode}${yearCode}` },
-          }).sort({ registrationNo: -1 });
-
-          let serialNo = "001";
-          if (lastStudent) {
-            const lastRegNo = lastStudent.registrationNo;
-            const lastSerial = parseInt(lastRegNo.slice(-3));
-            serialNo = String(lastSerial + 1).padStart(3, "0");
-          }
-
-          studentData.registrationNo = `${classCode}${yearCode}${serialNo}`;
-        }
-
-        // ✅ Ensure barcode exists (or regenerate if registrationNo changed)
-        if (
-          !existingStudent.barcode ||
-          studentData.registrationNo !== existingStudent.registrationNo
-        ) {
-          const barcodeBuffer = await bwipjs.toBuffer({
-            bcid: "code128",
-            text: studentData.registrationNo || existingStudent.registrationNo,
-            scale: 3,
-            height: 10,
-            includetext: true,
-            textxalign: "center",
-          });
-
-          studentData.barcode = `data:image/png;base64,${barcodeBuffer.toString(
-            "base64"
-          )}`;
-        }
-
-        // ✅ Update student
-        const updatedStudent = await Student.findByIdAndUpdate(
-          id,
-          { $set: studentData },
-          {
-            new: true,
-            runValidators: true,
-          }
-        );
-
-        res.status(200).json({
-          success: true,
-          message: "Student updated successfully",
-          data: updatedStudent,
-        });
-      } catch (error) {
-        // Handle duplicate key error (Aadhar number)
-        if (error.code === 11000) {
-          return res.status(400).json({
-            success: false,
-            message: "A student with this Aadhar number already exists",
-          });
-        }
-
-        if (error.name === "ValidationError") {
-          const errors = Object.values(error.errors).map((err) => err.message);
-          return res.status(400).json({
-            success: false,
-            message: "Validation failed",
-            errors: errors,
-          });
-        }
-
-        if (error.name === "CastError") {
-          return res.status(400).json({
-            success: false,
-            message: "Invalid student ID format",
-          });
-        }
-
-        console.error("Error updating student:", error);
-        res.status(500).json({
+      } catch (uploadErr) {
+        console.error("Image upload failed:", uploadErr);
+        return res.status(500).json({
           success: false,
-          message: "Internal server error",
+          message: "Failed to upload image",
         });
       }
+    }
+
+    // ✅ Extra validation for courseDetails
+    if (studentData.courseDetails) {
+      const {
+        paymentType,
+        downPayment,
+        nextPaymentDueDate,
+        paymentMode,
+        transactionId,
+      } = studentData.courseDetails;
+
+      if (paymentType === "EMI" && (!downPayment || !nextPaymentDueDate)) {
+        return res.status(400).json({
+          success: false,
+          message:
+            "For EMI payment type, downPayment and nextPaymentDueDate are required",
+        });
+      }
+
+      if (paymentMode === "UPI" && !transactionId) {
+        return res.status(400).json({
+          success: false,
+          message: "Transaction Id required",
+        });
+      }
+    }
+
+    // ✅ Regenerate registrationNo if className changed
+    if (
+      studentData.className &&
+      studentData.className !== existingStudent.className
+    ) {
+      const classMap = {
+        "9th": "09",
+        "10th": "10",
+        "11th": "11",
+        "12th": "12",
+      };
+
+      const classCode = classMap[studentData.className] || "00";
+      const yearCode = new Date().getFullYear().toString().slice(-2);
+
+      const lastStudent = await Student.findOne({
+        className: studentData.className,
+        registrationNo: { $regex: `^${classCode}${yearCode}` },
+      }).sort({ registrationNo: -1 });
+
+      let serialNo = "001";
+      if (lastStudent) {
+        const lastRegNo = lastStudent.registrationNo;
+        const lastSerial = parseInt(lastRegNo.slice(-3));
+        serialNo = String(lastSerial + 1).padStart(3, "0");
+      }
+
+      studentData.registrationNo = `${classCode}${yearCode}${serialNo}`;
+    }
+
+    // ✅ Regenerate QR code if registrationNo changed
+    if (
+      !existingStudent.qrCode ||
+      studentData.registrationNo !== existingStudent.registrationNo
+    ) {
+      try {
+        const qrCodeData = await QRCode.toDataURL(
+          studentData.registrationNo || existingStudent.registrationNo,
+          {
+            errorCorrectionLevel: "H",
+            type: "image/png",
+            width: 300,
+            margin: 2,
+          }
+        );
+
+        studentData.qrCode = qrCodeData;
+        studentData.qrCodeData =
+          studentData.registrationNo || existingStudent.registrationNo;
+      } catch (qrErr) {
+        console.error("QR Code generation failed:", qrErr);
+        return res.status(500).json({
+          success: false,
+          message: "Failed to generate QR Code",
+        });
+      }
+    }
+
+    // ✅ Update student
+    const updatedStudent = await Student.findByIdAndUpdate(
+      id,
+      { $set: studentData },
+      { new: true, runValidators: true }
+    );
+
+    res.status(200).json({
+      success: true,
+      message: "Student updated successfully",
+      data: updatedStudent,
     });
   } catch (error) {
-    console.error("Unexpected error:", error);
+    if (error.code === 11000) {
+      return res.status(400).json({
+        success: false,
+        message: "A student with this Aadhar number already exists",
+      });
+    }
+
+    if (error.name === "ValidationError") {
+      const errors = Object.values(error.errors).map((err) => err.message);
+      return res.status(400).json({
+        success: false,
+        message: "Validation failed",
+        errors,
+      });
+    }
+
+    if (error.name === "CastError") {
+      return res.status(400).json({
+        success: false,
+        message: "Invalid student ID format",
+      });
+    }
+
+    console.error("Error updating student:", error);
     res.status(500).json({
       success: false,
-      message: "An unexpected error occurred",
+      message: "Internal server error",
     });
   }
 };
@@ -666,7 +650,7 @@ exports.getStudents = async (req, res) => {
       .limit(limitNum)
       .select('-__v')
         .populate("courseDetails.courseId", "name fee")
-  .populate("courseDetails.additionalCourseId", "name fee")
+  .populate("courseDetails.additionalCourseId", "name")
   .populate("courseDetails.batchId", "batchName")
 
     // Get total count for pagination info
@@ -706,7 +690,7 @@ exports.getStudentById = async (req, res) => {
     const student = await Student.findById(id)
       .select('-__v')
       .populate("courseDetails.courseId", "name fee")
-      .populate("courseDetails.additionalCourseId", "name fee")
+      .populate("courseDetails.additionalCourseId", "name")
       .populate("courseDetails.batchId", "batchName");
 
     if (!student) {
