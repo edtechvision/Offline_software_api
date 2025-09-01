@@ -467,6 +467,7 @@ exports.getStudents = async (req, res) => {
       sortBy = 'createdAt',
       sortOrder = 'desc',
       batchId,         // ✅ new filter
+      courseId,         // ✅ new filter
       className        // ✅ new filter
     } = req.query;
 
@@ -500,6 +501,9 @@ exports.getStudents = async (req, res) => {
     // ✅ Apply batch filter
     if (batchId) {
       searchQuery["courseDetails.batchId"] = batchId;
+    }
+    if (courseId) {
+      searchQuery["courseDetails.courseId"] = courseId;
     }
 
     // ✅ Apply class filter
