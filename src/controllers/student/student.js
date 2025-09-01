@@ -465,7 +465,9 @@ exports.getStudents = async (req, res) => {
       limit = 10,
       search = '',
       sortBy = 'createdAt',
-      sortOrder = 'desc'
+      sortOrder = 'desc',
+      batchId,         // ✅ new filter
+      className        // ✅ new filter
     } = req.query;
 
     // Parse pagination parameters
@@ -473,13 +475,12 @@ exports.getStudents = async (req, res) => {
     const limitNum = parseInt(limit);
     const skip = (pageNum - 1) * limitNum;
 
-    // Build search query
+    // Build search + filter query
     const searchQuery = {};
     
+    // Apply search
     if (search) {
       const searchRegex = new RegExp(search, 'i');
-      
-      // Search across multiple fields
       searchQuery.$or = [
         { studentName: searchRegex },
         { fathersName: searchRegex },
@@ -496,6 +497,16 @@ exports.getStudents = async (req, res) => {
       ];
     }
 
+    // ✅ Apply batch filter
+    if (batchId) {
+      searchQuery["courseDetails.batchId"] = batchId;
+    }
+
+    // ✅ Apply class filter
+    if (className) {
+      searchQuery["className"] = className;
+    }
+
     // Build sort object
     const sortOptions = {};
     sortOptions[sortBy] = sortOrder === 'desc' ? -1 : 1;
@@ -506,9 +517,9 @@ exports.getStudents = async (req, res) => {
       .skip(skip)
       .limit(limitNum)
       .select('-__v')
-        .populate("courseDetails.courseId", "name fee")
-  .populate("courseDetails.additionalCourseId", "name")
-  .populate("courseDetails.batchId", "batchName")
+      .populate("courseDetails.courseId", "name fee")
+      .populate("courseDetails.additionalCourseId", "name")
+      .populate("courseDetails.batchId", "batchName");
 
     // Get total count for pagination info
     const totalStudents = await Student.countDocuments(searchQuery);
@@ -538,6 +549,7 @@ exports.getStudents = async (req, res) => {
     });
   }
 };
+
 
 exports.getStudentById = async (req, res) => {
   try {
