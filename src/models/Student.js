@@ -56,6 +56,8 @@ const studentSchema = new mongoose.Schema({
     image: { type: String }, // ✅ Moved here (student’s photo)
 
   courseDetails: { type: courseSchema, required: true },
+    isActive: { type: Boolean, default: false },  // ✅ Added field
+
   createdAt: { type: Date, default: Date.now },
   updatedAt: { type: Date, default: Date.now }
 });

@@ -571,3 +571,40 @@ exports.getStudentById = async (req, res) => {
     });
   }
 };
+
+
+
+
+// ✅ Activate student
+exports.activateStudent = async (req, res) => {
+  try {
+    const { id } = req.params;
+    const student = await Student.findByIdAndUpdate(
+      id,
+      { isActive: true, updatedAt: Date.now() },
+      { new: true }
+    );
+
+    if (!student) return res.status(404).json({ message: "Student not found" });
+    res.status(200).json({ message: "Student activated successfully", student });
+  } catch (err) {
+    res.status(500).json({ message: err.message });
+  }
+};
+
+// ✅ Deactivate student
+exports.deactivateStudent = async (req, res) => {
+  try {
+    const { id } = req.params;
+    const student = await Student.findByIdAndUpdate(
+      id,
+      { isActive: false, updatedAt: Date.now() },
+      { new: true }
+    );
+
+    if (!student) return res.status(404).json({ message: "Student not found" });
+    res.status(200).json({ message: "Student deactivated successfully", student });
+  } catch (err) {
+    res.status(500).json({ message: err.message });
+  }
+};
