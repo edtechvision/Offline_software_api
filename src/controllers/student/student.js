@@ -187,6 +187,189 @@ exports.createStudent = async (req, res) => {
 
 
 // ✅ UPDATE STUDENT
+// exports.updateStudent = async (req, res) => {
+//   try {
+//     const { id } = req.params;
+//     const updateData = req.body;
+
+//     const existingStudent = await Student.findById(id);
+//     if (!existingStudent) {
+//       return res.status(404).json({ success: false, message: "Student not found" });
+//     }
+
+//     // Parse JSON fields safely
+//     try {
+//       updateData.presentAddress = parseJsonField(updateData.presentAddress, "presentAddress", existingStudent.presentAddress);
+//       updateData.permanentAddress = parseJsonField(updateData.permanentAddress, "permanentAddress", existingStudent.permanentAddress);
+//       updateData.courseDetails = parseJsonField(updateData.courseDetails, "courseDetails", existingStudent.courseDetails);
+//     } catch (err) {
+//       return res.status(400).json({ success: false, message: err.message });
+//     }
+
+//     if (updateData.isPermanentSameAsPresent) {
+//       updateData.permanentAddress = updateData.presentAddress || existingStudent.presentAddress;
+//     }
+
+//     // Regenerate registration no if className changes
+//     if (updateData.className && updateData.className !== existingStudent.className) {
+//       updateData.registrationNo = await generateRegistrationNo(Student, updateData.className);
+//     }
+
+//     // Validate email
+//     if (updateData.email) {
+//       const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
+//       if (!emailRegex.test(updateData.email)) {
+//         return res.status(400).json({ success: false, message: "Invalid email format" });
+//       }
+//     }
+
+//     // Handle image replacement
+//     if (req.file) {
+//       if (existingStudent.image) {
+//         const key = existingStudent.image.split("/").slice(3).join("/");
+//         await deleteImage(key);
+//       }
+//       try {
+//         const { image } = await uploadImage(req.file);
+//         updateData.image = image;
+//       } catch (err) {
+//         return res.status(500).json({ success: false, message: "Failed to upload image" });
+//       }
+//     }
+
+//     // Handle course + fee update
+//     if (updateData.courseDetails) {
+//       const {
+//         courseId,
+//         batchId,
+//         courseFee,
+//         paymentType,
+//         downPayment,
+//         nextPaymentDueDate,
+//         paymentMode,
+//         transactionId,
+//       } = updateData.courseDetails;
+
+//       // Validation
+//       if (paymentType === "EMI" && (!downPayment || !nextPaymentDueDate)) {
+//         return res.status(400).json({
+//           success: false,
+//           message: "For EMI, downPayment and nextPaymentDueDate are required",
+//         });
+//       }
+//       if (paymentMode === "UPI" && !transactionId) {
+//         return res.status(400).json({ success: false, message: "Transaction Id required" });
+//       }
+
+//       // Fetch existing fee record
+//       let fee = await Fee.findOne({ studentId: existingStudent._id });
+
+//       if (!fee) {
+//         // Edge case: no fee yet → create one
+//         const paidAmount = paymentType === "Full-Payment" ? courseFee : (downPayment || 0);
+//         const pendingAmount = courseFee - paidAmount;
+
+//         fee = new Fee({
+//           studentId: existingStudent._id,
+//           courseId,
+//           batchId,
+//           totalFee: courseFee,
+//           paidAmount,
+//           pendingAmount,
+//           nextPaymentDueDate: paymentType === "EMI" ? nextPaymentDueDate : null,
+//           status:
+//             pendingAmount === 0 ? "Completed" : paidAmount > 0 ? "Partial" : "Pending",
+//           paymentHistory:
+//             paidAmount > 0
+//               ? [
+//                   {
+//                     amount: paidAmount,
+//                     paymentMode,
+//                     transactionId,
+//                      receiptNo: generateReceiptNo(),
+//                     remarks:
+//                       paymentType === "Full-Payment"
+//                         ? "Full Payment at Admission"
+//                         : "Down Payment at Admission",
+//                   },
+//                 ]
+//               : [],
+//         });
+//       } else {
+//         // Overwrite/update the same Fee record
+//         fee.courseId = courseId || fee.courseId;
+//         fee.batchId = batchId || fee.batchId;
+//         fee.totalFee = courseFee || fee.totalFee;
+
+//         // Recalculate amounts if fee or paymentType changed
+//         if (courseFee) {
+//           const paidAmount =
+//             paymentType === "Full-Payment" ? courseFee : fee.paidAmount;
+//           fee.paidAmount = paidAmount;
+//           fee.pendingAmount = courseFee - paidAmount;
+//         }
+
+//         // Append new payment if provided
+//         if (downPayment || transactionId) {
+//           fee.paymentHistory.push({
+//             amount: downPayment || 0,
+//             paymentMode,
+//             transactionId,
+//            receiptNo: generateReceiptNo(),
+//             remarks:
+//               paymentType === "Full-Payment"
+//                 ? "Full Payment (Updated)"
+//                 : "Additional Payment during Update",
+//           });
+//           fee.paidAmount += downPayment || 0;
+//           fee.pendingAmount = fee.totalFee - fee.paidAmount;
+//         }
+
+//         // Update status
+//         fee.status =
+//           fee.pendingAmount === 0
+//             ? "Completed"
+//             : fee.paidAmount > 0
+//             ? "Partial"
+//             : "Pending";
+
+//         // Update EMI due date if relevant
+//         if (paymentType === "EMI" && nextPaymentDueDate) {
+//           fee.nextPaymentDueDate = nextPaymentDueDate;
+//         }
+//       }
+
+//       await fee.save();
+//     }
+
+//     // Regenerate QR if regNo changed
+//     if (updateData.registrationNo && updateData.registrationNo !== existingStudent.registrationNo) {
+//       try {
+//         updateData.qrCode = await generateQRCode(updateData.registrationNo);
+//         updateData.qrCodeData = updateData.registrationNo;
+//       } catch {
+//         return res.status(500).json({ success: false, message: "Failed to generate QR Code" });
+//       }
+//     }
+
+//     const updatedStudent = await Student.findByIdAndUpdate(id, updateData, {
+//       new: true,
+//       runValidators: true,
+//     });
+
+//     res.status(200).json({ success: true, message: "Student updated", data: updatedStudent });
+//   } catch (error) {
+//     if (error.code === 11000) {
+//       return res.status(400).json({ success: false, message: "Student with this Aadhar exists" });
+//     }
+//     if (error.name === "ValidationError") {
+//       const errors = Object.values(error.errors).map((e) => e.message);
+//       return res.status(400).json({ success: false, message: "Validation failed", errors });
+//     }
+//     res.status(500).json({ success: false, message: "Internal server error" });
+//   }
+// };
+
 exports.updateStudent = async (req, res) => {
   try {
     const { id } = req.params;
@@ -199,27 +382,48 @@ exports.updateStudent = async (req, res) => {
 
     // Parse JSON fields safely
     try {
-      updateData.presentAddress = parseJsonField(updateData.presentAddress, "presentAddress", existingStudent.presentAddress);
-      updateData.permanentAddress = parseJsonField(updateData.permanentAddress, "permanentAddress", existingStudent.permanentAddress);
-      updateData.courseDetails = parseJsonField(updateData.courseDetails, "courseDetails", existingStudent.courseDetails);
+      updateData.presentAddress = parseJsonField(
+        updateData.presentAddress,
+        "presentAddress",
+        existingStudent.presentAddress
+      );
+      updateData.permanentAddress = parseJsonField(
+        updateData.permanentAddress,
+        "permanentAddress",
+        existingStudent.permanentAddress
+      );
+      updateData.courseDetails = parseJsonField(
+        updateData.courseDetails,
+        "courseDetails",
+        existingStudent.courseDetails
+      );
     } catch (err) {
       return res.status(400).json({ success: false, message: err.message });
     }
 
     if (updateData.isPermanentSameAsPresent) {
-      updateData.permanentAddress = updateData.presentAddress || existingStudent.presentAddress;
+      updateData.permanentAddress =
+        updateData.presentAddress || existingStudent.presentAddress;
     }
 
     // Regenerate registration no if className changes
-    if (updateData.className && updateData.className !== existingStudent.className) {
-      updateData.registrationNo = await generateRegistrationNo(Student, updateData.className);
+    if (
+      updateData.className &&
+      updateData.className !== existingStudent.className
+    ) {
+      updateData.registrationNo = await generateRegistrationNo(
+        Student,
+        updateData.className
+      );
     }
 
     // Validate email
     if (updateData.email) {
       const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
       if (!emailRegex.test(updateData.email)) {
-        return res.status(400).json({ success: false, message: "Invalid email format" });
+        return res
+          .status(400)
+          .json({ success: false, message: "Invalid email format" });
       }
     }
 
@@ -233,12 +437,19 @@ exports.updateStudent = async (req, res) => {
         const { image } = await uploadImage(req.file);
         updateData.image = image;
       } catch (err) {
-        return res.status(500).json({ success: false, message: "Failed to upload image" });
+        return res
+          .status(500)
+          .json({ success: false, message: "Failed to upload image" });
       }
     }
 
-    // Handle course + fee update
-    if (updateData.courseDetails) {
+    // Handle course + fee update ONLY if courseId changes
+    if (
+      updateData.courseDetails &&
+      updateData.courseDetails.courseId &&
+      updateData.courseDetails.courseId.toString() !==
+        existingStudent.courseDetails?.courseId?.toString()
+    ) {
       const {
         courseId,
         batchId,
@@ -258,15 +469,18 @@ exports.updateStudent = async (req, res) => {
         });
       }
       if (paymentMode === "UPI" && !transactionId) {
-        return res.status(400).json({ success: false, message: "Transaction Id required" });
+        return res
+          .status(400)
+          .json({ success: false, message: "Transaction Id required" });
       }
 
-      // Fetch existing fee record
+      // Either find existing fee or create fresh
       let fee = await Fee.findOne({ studentId: existingStudent._id });
 
       if (!fee) {
-        // Edge case: no fee yet → create one
-        const paidAmount = paymentType === "Full-Payment" ? courseFee : (downPayment || 0);
+        // New fee record
+        const paidAmount =
+          paymentType === "Full-Payment" ? courseFee : downPayment || 0;
         const pendingAmount = courseFee - paidAmount;
 
         fee = new Fee({
@@ -276,9 +490,14 @@ exports.updateStudent = async (req, res) => {
           totalFee: courseFee,
           paidAmount,
           pendingAmount,
-          nextPaymentDueDate: paymentType === "EMI" ? nextPaymentDueDate : null,
+          nextPaymentDueDate:
+            paymentType === "EMI" ? nextPaymentDueDate : null,
           status:
-            pendingAmount === 0 ? "Completed" : paidAmount > 0 ? "Partial" : "Pending",
+            pendingAmount === 0
+              ? "Completed"
+              : paidAmount > 0
+              ? "Partial"
+              : "Pending",
           paymentHistory:
             paidAmount > 0
               ? [
@@ -286,7 +505,7 @@ exports.updateStudent = async (req, res) => {
                     amount: paidAmount,
                     paymentMode,
                     transactionId,
-                     receiptNo: generateReceiptNo(),
+                    receiptNo: generateReceiptNo(),
                     remarks:
                       paymentType === "Full-Payment"
                         ? "Full Payment at Admission"
@@ -296,59 +515,58 @@ exports.updateStudent = async (req, res) => {
               : [],
         });
       } else {
-        // Overwrite/update the same Fee record
-        fee.courseId = courseId || fee.courseId;
-        fee.batchId = batchId || fee.batchId;
-        fee.totalFee = courseFee || fee.totalFee;
+        // Reset fee details for new course
+        const paidAmount =
+          paymentType === "Full-Payment" ? courseFee : downPayment || 0;
+        const pendingAmount = courseFee - paidAmount;
 
-        // Recalculate amounts if fee or paymentType changed
-        if (courseFee) {
-          const paidAmount =
-            paymentType === "Full-Payment" ? courseFee : fee.paidAmount;
-          fee.paidAmount = paidAmount;
-          fee.pendingAmount = courseFee - paidAmount;
-        }
+        fee.courseId = courseId;
+        fee.batchId = batchId;
+        fee.totalFee = courseFee;
+        fee.paidAmount = paidAmount;
+        fee.pendingAmount = pendingAmount;
+        fee.nextPaymentDueDate =
+          paymentType === "EMI" ? nextPaymentDueDate : null;
 
-        // Append new payment if provided
-        if (downPayment || transactionId) {
-          fee.paymentHistory.push({
-            amount: downPayment || 0,
-            paymentMode,
-            transactionId,
-           receiptNo: generateReceiptNo(),
-            remarks:
-              paymentType === "Full-Payment"
-                ? "Full Payment (Updated)"
-                : "Additional Payment during Update",
-          });
-          fee.paidAmount += downPayment || 0;
-          fee.pendingAmount = fee.totalFee - fee.paidAmount;
-        }
+        fee.paymentHistory =
+          paidAmount > 0
+            ? [
+                {
+                  amount: paidAmount,
+                  paymentMode,
+                  transactionId,
+                  receiptNo: generateReceiptNo(),
+                  remarks:
+                    paymentType === "Full-Payment"
+                      ? "Full Payment (New Course)"
+                      : "Down Payment (New Course)",
+                },
+              ]
+            : [];
 
-        // Update status
         fee.status =
-          fee.pendingAmount === 0
+          pendingAmount === 0
             ? "Completed"
-            : fee.paidAmount > 0
+            : paidAmount > 0
             ? "Partial"
             : "Pending";
-
-        // Update EMI due date if relevant
-        if (paymentType === "EMI" && nextPaymentDueDate) {
-          fee.nextPaymentDueDate = nextPaymentDueDate;
-        }
       }
 
       await fee.save();
     }
 
     // Regenerate QR if regNo changed
-    if (updateData.registrationNo && updateData.registrationNo !== existingStudent.registrationNo) {
+    if (
+      updateData.registrationNo &&
+      updateData.registrationNo !== existingStudent.registrationNo
+    ) {
       try {
         updateData.qrCode = await generateQRCode(updateData.registrationNo);
         updateData.qrCodeData = updateData.registrationNo;
       } catch {
-        return res.status(500).json({ success: false, message: "Failed to generate QR Code" });
+        return res
+          .status(500)
+          .json({ success: false, message: "Failed to generate QR Code" });
       }
     }
 
@@ -357,18 +575,29 @@ exports.updateStudent = async (req, res) => {
       runValidators: true,
     });
 
-    res.status(200).json({ success: true, message: "Student updated", data: updatedStudent });
+    res.status(200).json({
+      success: true,
+      message: "Student updated",
+      data: updatedStudent,
+    });
   } catch (error) {
     if (error.code === 11000) {
-      return res.status(400).json({ success: false, message: "Student with this Aadhar exists" });
+      return res
+        .status(400)
+        .json({ success: false, message: "Student with this Aadhar exists" });
     }
     if (error.name === "ValidationError") {
       const errors = Object.values(error.errors).map((e) => e.message);
-      return res.status(400).json({ success: false, message: "Validation failed", errors });
+      return res
+        .status(400)
+        .json({ success: false, message: "Validation failed", errors });
     }
-    res.status(500).json({ success: false, message: "Internal server error" });
+    res
+      .status(500)
+      .json({ success: false, message: "Internal server error" });
   }
 };
+
 
 exports.getStudents = async (req, res) => {
   try {
