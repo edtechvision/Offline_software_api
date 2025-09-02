@@ -10,5 +10,7 @@ router.get("/fees/all-payments", feeController.getAllPayments);
 router.post("/fees/revert-payment", feeController.revertPayment);
 
 router.get("/fees/pending", feeController.getPendingFees);
+router.get("/students-collect-fees", feeController.getCollectFeesStudents);
+
 
 module.exports = router;
