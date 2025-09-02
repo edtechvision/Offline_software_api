@@ -10,6 +10,7 @@ const courseRoute = require("../routes/course/courseRoutes");
 const studentRoute = require("../routes/student/studentRoute");
 const additionalCourseRoute = require("../routes/additionalCourse/additionalCourse");
 const feesDiscountRoute = require("../routes/feesDiscount/feesDiscountRoutes");
+const feesRoute = require("../routes/feeRoutes/feeRoutes");
 
 
 
@@ -26,6 +27,7 @@ router.use("/api/v1", batchRoute);
 router.use("/api/v1", courseRoute);
 router.use("/api/v1", additionalCourseRoute);
 router.use("/api/v1", feesDiscountRoute);
+router.use("/api/v1", feesRoute);
 
 
 

@@ -25,6 +25,7 @@ const courseSchema = new mongoose.Schema({
     transactionId: { type: String }, // ✅ Added transactionId for UPI payments
 
   image: { type: String }, // Path to uploaded image
+ 
   referenceNumber: { type: String }
 });
 
@@ -54,9 +55,20 @@ const studentSchema = new mongoose.Schema({
   collegeName: { type: String, required: true },
   className: { type: String, required: true },
     image: { type: String }, // ✅ Moved here (student’s photo)
-
+ imageKey: { type: String }, // Path to uploaded image
   courseDetails: { type: courseSchema, required: true },
     isActive: { type: Boolean, default: false },  // ✅ Added field
+      centerCode: {
+    type: String,
+    required: true,
+    trim: true
+  },
+
+  centerId: {
+    type: mongoose.Schema.Types.ObjectId,
+    ref: "Center",
+    required: true
+  },
 
   createdAt: { type: Date, default: Date.now },
   updatedAt: { type: Date, default: Date.now }

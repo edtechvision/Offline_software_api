@@ -8,7 +8,7 @@ const multer = require("multer");
 const upload = multer({ storage: multer.memoryStorage() });
 // /api/courses
 router.post('/student',upload.single("image"), ctrl.createStudent);
-router.put('/student-update/:id', ctrl.updateStudent);
+router.put('/student-update/:id',upload.single("image"), ctrl.updateStudent);
 router.get('/students', ctrl.getStudents);
 router.get('/students/:id', ctrl.getStudentById);
 router.put('/students/:id/activate', ctrl.activateStudent);
