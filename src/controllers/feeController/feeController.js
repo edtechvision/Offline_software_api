@@ -58,58 +58,6 @@ function generateReceiptNo() {
   return `TBREC${randomNum}`;
 }
 
-// exports.addPayment = async (req, res) => {
-//   try {
-//     const { feeId, amount, paymentMode, transactionId, remarks } = req.body;
-
-//     const fee = await Fee.findById(feeId);
-//     if (!fee) {
-//       return res.status(404).json({ success: false, message: "Fee record not found" });
-//     }
-
-//     // ✅ Previous received amount before this payment
-//     const previousReceivedAmount = fee.paidAmount || 0;
-
-//     // ✅ Update payment totals
-//     fee.paidAmount += amount;
-//     fee.pendingAmount = Math.max(0, fee.totalFee - fee.paidAmount);
-
-//     // ✅ Add payment history with previousReceivedAmount & receiptNo
-//     fee.paymentHistory.push({
-//       amount,
-//       previousReceivedAmount,
-//       pendingAmountAfterPayment: fee.pendingAmount, // ✅ Corrected
-//       paymentMode,
-//       transactionId,
-//       remarks,
-//       receiptNo: generateReceiptNo(),
-//     });
-
-//     // ✅ Update status
-//     if (fee.pendingAmount === 0) {
-//       fee.status = "Completed";
-//     } else if (fee.paidAmount > 0) {
-//       fee.status = "Partial";
-//     } else {
-//       fee.status = "Pending";
-//     }
-
-//     const updatedFee = await fee.save();
-
-//     res.status(200).json({
-//       success: true,
-//       message: "Payment added successfully",
-//       data: updatedFee,
-//     });
-//   } catch (error) {
-//     console.error("Error adding payment:", error);
-//     res.status(500).json({
-//       success: false,
-//       message: "Internal server error",
-//     });
-//   }
-// };
-
 
 // ✅ Get Fees by Student
 // exports.getStudentFees = async (req, res) => {
@@ -140,7 +88,7 @@ function generateReceiptNo() {
 //   try {
 //     const {
 //       feeId,
-//       amount,
+//       amount, // ✅ treated as final paid amount (after discount)
 //       paymentMode,
 //       transactionId,
 //       remarks,
@@ -157,36 +105,41 @@ function generateReceiptNo() {
 //         .json({ success: false, message: "Fee record not found" });
 //     }
 
-//     // ✅ Previous received amount before this payment
-//     const previousReceivedAmount = fee.paidAmount || 0;
+//     // ✅ Force numeric values
+//     const prevPaid = Number(fee.paidAmount) || 0;
+//     const amt = Number(amount) || 0;
+//     const extraFine = Number(fine) || 0;
 
-//     // ✅ Update payment totals (consider fine and discount)
-//     const netAmount = amount + fine - discountAmount;
-//     fee.paidAmount += netAmount;
-//     fee.pendingAmount = Math.max(0, fee.totalFee - fee.paidAmount);
+//     // ✅ Previous received amount before this payment
+//     const previousReceivedAmount = prevPaid;
+
+//     // ✅ Update payment totals
+//     const netAmount = amt + extraFine;
+//     fee.paidAmount = prevPaid + netAmount;
+//     fee.pendingAmount = Math.max(0, Number(fee.totalFee) - fee.paidAmount);
 
 //     // ✅ Handle optional discount file upload
 //     let discountFileUrl = null;
 //     if (req.file) {
 //       const params = {
-//         Bucket: process.env.DO_SPACE_BUCKET, // your bucket name
-//         Key: `discounts/${Date.now()}_${req.file.originalname}`, // file path
+//         Bucket: process.env.DO_SPACE_BUCKET,
+//         Key: `discounts/${Date.now()}_${req.file.originalname}`,
 //         Body: req.file.buffer,
-//         ACL: "public-read", // so it's accessible
+//         ACL: "public-read",
 //         ContentType: req.file.mimetype,
 //       };
 
 //       const uploaded = await s3.upload(params).promise();
-//       discountFileUrl = uploaded.Location; // store file URL
+//       discountFileUrl = uploaded.Location;
 //     }
 
 //     // ✅ Add payment history
 //     fee.paymentHistory.push({
-//       amount,
-//       fine,
+//       amount: amt,
+//       fine: extraFine,
 //       discountCode,
-//       discountAmount,
-//       discountFile: discountFileUrl, // ✅ store file url if uploaded
+//       discountAmount: Number(discountAmount) || 0,
+//       discountFile: discountFileUrl,
 //       previousReceivedAmount,
 //       pendingAmountAfterPayment: fee.pendingAmount,
 //       paymentMode,
@@ -225,7 +178,7 @@ exports.addPayment = async (req, res) => {
   try {
     const {
       feeId,
-      amount, // ✅ treated as final paid amount (after discount)
+      amount, // ✅ amount student actually paid (after discount)
       paymentMode,
       transactionId,
       remarks,
@@ -246,14 +199,25 @@ exports.addPayment = async (req, res) => {
     const prevPaid = Number(fee.paidAmount) || 0;
     const amt = Number(amount) || 0;
     const extraFine = Number(fine) || 0;
+    const effectiveDiscount = Number(discountAmount) || 0;
 
     // ✅ Previous received amount before this payment
     const previousReceivedAmount = prevPaid;
 
     // ✅ Update payment totals
     const netAmount = amt + extraFine;
+
+    // Paid amount = only what student actually paid (not discount)
     fee.paidAmount = prevPaid + netAmount;
-    fee.pendingAmount = Math.max(0, Number(fee.totalFee) - fee.paidAmount);
+
+    // Track total discounts on fee
+    fee.totalDiscount = (Number(fee.totalDiscount) || 0) + effectiveDiscount;
+
+    // Pending = totalFee - (paid + totalDiscount)
+    fee.pendingAmount = Math.max(
+      0,
+      Number(fee.totalFee) - (fee.paidAmount + fee.totalDiscount)
+    );
 
     // ✅ Handle optional discount file upload
     let discountFileUrl = null;
@@ -275,7 +239,7 @@ exports.addPayment = async (req, res) => {
       amount: amt,
       fine: extraFine,
       discountCode,
-      discountAmount: Number(discountAmount) || 0,
+      discountAmount: effectiveDiscount,
       discountFile: discountFileUrl,
       previousReceivedAmount,
       pendingAmountAfterPayment: fee.pendingAmount,
@@ -422,6 +386,7 @@ exports.getAllPayments = async (req, res) => {
 };
 
 
+
 // exports.revertPayment = async (req, res) => {
 //   try {
 //     const { feeId, receiptNo } = req.body;
@@ -447,11 +412,9 @@ exports.getAllPayments = async (req, res) => {
 //     // ✅ Get payment to delete
 //     const paymentToDelete = fee.paymentHistory[paymentIndex];
 
-//     // ✅ Calculate net effect (what was actually added to paidAmount)
+//     // ✅ Net effect (since amount is already final after discount)
 //     const netAmount =
-//       (paymentToDelete.amount || 0) +
-//       (paymentToDelete.fine || 0) -
-//       (paymentToDelete.discountAmount || 0);
+//       (paymentToDelete.amount || 0) + (paymentToDelete.fine || 0);
 
 //     // ✅ Deduct from totals
 //     fee.paidAmount = Math.max(0, fee.paidAmount - netAmount);
@@ -507,16 +470,29 @@ exports.revertPayment = async (req, res) => {
         .json({ success: false, message: "Payment record not found" });
     }
 
-    // ✅ Get payment to delete
+    // ✅ Get payment to revert
     const paymentToDelete = fee.paymentHistory[paymentIndex];
 
-    // ✅ Net effect (since amount is already final after discount)
+    // ✅ Net effect (paid + fine only, discount handled separately)
     const netAmount =
       (paymentToDelete.amount || 0) + (paymentToDelete.fine || 0);
 
-    // ✅ Deduct from totals
+    // ✅ Deduct paid amount
     fee.paidAmount = Math.max(0, fee.paidAmount - netAmount);
-    fee.pendingAmount = Math.max(0, fee.totalFee - fee.paidAmount);
+
+    // ✅ Deduct discount from totalDiscount
+    if (paymentToDelete.discountAmount) {
+      fee.totalDiscount = Math.max(
+        0,
+        (Number(fee.totalDiscount) || 0) - Number(paymentToDelete.discountAmount)
+      );
+    }
+
+    // ✅ Recalculate pending = totalFee - (paid + discount)
+    fee.pendingAmount = Math.max(
+      0,
+      Number(fee.totalFee) - (fee.paidAmount + fee.totalDiscount)
+    );
 
     // ✅ Remove payment from history
     fee.paymentHistory.splice(paymentIndex, 1);
@@ -545,7 +521,6 @@ exports.revertPayment = async (req, res) => {
     });
   }
 };
-
 
 exports.getPendingFees = async (req, res) => {
   try {
