@@ -509,6 +509,8 @@ exports.getCollectFeesStudents = async (req, res) => {
     const result = students.map(s => {
       const fee = feeMap[s._id.toString()] || {};
       return {
+            studentId: s._id,  // <-- add studentId here
+
         studentName: s.studentName,
         fathersName: s.fathersName,
         mobileNumber: s.mobileNumber,
