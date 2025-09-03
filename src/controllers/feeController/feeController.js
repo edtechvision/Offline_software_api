@@ -242,13 +242,18 @@ exports.addPayment = async (req, res) => {
         .json({ success: false, message: "Fee record not found" });
     }
 
-    // ✅ Previous received amount before this payment
-    const previousReceivedAmount = fee.paidAmount || 0;
+    // ✅ Force numeric values
+    const prevPaid = Number(fee.paidAmount) || 0;
+    const amt = Number(amount) || 0;
+    const extraFine = Number(fine) || 0;
 
-    // ✅ Update payment totals (discount does not reduce amount here)
-    const netAmount = amount + fine;
-    fee.paidAmount += netAmount;
-    fee.pendingAmount = Math.max(0, fee.totalFee - fee.paidAmount);
+    // ✅ Previous received amount before this payment
+    const previousReceivedAmount = prevPaid;
+
+    // ✅ Update payment totals
+    const netAmount = amt + extraFine;
+    fee.paidAmount = prevPaid + netAmount;
+    fee.pendingAmount = Math.max(0, Number(fee.totalFee) - fee.paidAmount);
 
     // ✅ Handle optional discount file upload
     let discountFileUrl = null;
@@ -267,10 +272,10 @@ exports.addPayment = async (req, res) => {
 
     // ✅ Add payment history
     fee.paymentHistory.push({
-      amount, // ✅ actual paid amount
-      fine,
+      amount: amt,
+      fine: extraFine,
       discountCode,
-      discountAmount,
+      discountAmount: Number(discountAmount) || 0,
       discountFile: discountFileUrl,
       previousReceivedAmount,
       pendingAmountAfterPayment: fee.pendingAmount,
@@ -305,6 +310,7 @@ exports.addPayment = async (req, res) => {
     });
   }
 };
+
 
 
 exports.getStudentFees = async (req, res) => {

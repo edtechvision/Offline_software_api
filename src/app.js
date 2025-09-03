@@ -27,6 +27,42 @@ async function addIsActiveFieldToExistingStudents() {
 // addIsActiveFieldToExistingStudents()
 
 // addIsActiveField();
+const Fee = require("./models/Fee");
+
+
+
+async function fixFeeRecords() {
+
+  const fees = await Fee.find({});
+  for (const fee of fees) {
+    // ✅ Recalculate paidAmount from payment history
+    const totalPaid = fee.paymentHistory.reduce(
+      (sum, p) => sum + Number(p.amount || 0) + Number(p.fine || 0),
+      0
+    );
+
+    fee.paidAmount = totalPaid;
+    fee.pendingAmount = Math.max(0, fee.totalFee - totalPaid);
+
+    // ✅ Fix status
+    if (fee.pendingAmount === 0) {
+      fee.status = "Completed";
+    } else if (fee.paidAmount > 0) {
+      fee.status = "Partial";
+    } else {
+      fee.status = "Pending";
+    }
+
+    await fee.save();
+    console.log(`Fixed Fee ID: ${fee._id}, Paid: ${fee.paidAmount}, Pending: ${fee.pendingAmount}`);
+  }
+
+  
+}
+
+// fixFeeRecords().catch(err => {
+//   console.error("Migration failed:", err);
+// });
 const routes = require("./routes/index");
 
 app.use(routes);
