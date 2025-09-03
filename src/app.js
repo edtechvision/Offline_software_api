@@ -63,6 +63,78 @@ async function fixFeeRecords() {
 // fixFeeRecords().catch(err => {
 //   console.error("Migration failed:", err);
 // });
+
+
+
+
+async function fixPaidAmounts() {
+  try {
+  
+    console.log("✅ Connected to MongoDB");
+
+    const fees = await Fee.find({});
+    let fixedCount = 0;
+
+    for (const fee of fees) {
+      let updated = false;
+
+      // 🔹 Force paidAmount to Number
+      if (typeof fee.paidAmount === "string") {
+        fee.paidAmount = Number(fee.paidAmount) || 0;
+        updated = true;
+      }
+
+      // 🔹 Force pendingAmount to Number
+      if (typeof fee.pendingAmount === "string") {
+        fee.pendingAmount = Number(fee.pendingAmount) || 0;
+        updated = true;
+      }
+
+      // 🔹 Also fix inside paymentHistory
+      fee.paymentHistory = fee.paymentHistory.map((p) => {
+        let changed = false;
+        const updatedPayment = { ...p._doc };
+
+        if (typeof updatedPayment.amount === "string") {
+          updatedPayment.amount = Number(updatedPayment.amount) || 0;
+          changed = true;
+        }
+        if (typeof updatedPayment.fine === "string") {
+          updatedPayment.fine = Number(updatedPayment.fine) || 0;
+          changed = true;
+        }
+        if (typeof updatedPayment.discountAmount === "string") {
+          updatedPayment.discountAmount = Number(updatedPayment.discountAmount) || 0;
+          changed = true;
+        }
+        if (typeof updatedPayment.previousReceivedAmount === "string") {
+          updatedPayment.previousReceivedAmount = Number(updatedPayment.previousReceivedAmount) || 0;
+          changed = true;
+        }
+        if (typeof updatedPayment.pendingAmountAfterPayment === "string") {
+          updatedPayment.pendingAmountAfterPayment = Number(updatedPayment.pendingAmountAfterPayment) || 0;
+          changed = true;
+        }
+
+        return changed ? updatedPayment : p;
+      });
+
+      if (updated) {
+        await fee.save();
+        fixedCount++;
+        console.log(`🔧 Fixed Fee ID: ${fee._id}`);
+      }
+    }
+
+    console.log(`\n✅ Finished. Fixed ${fixedCount} records.`);
+  } catch (err) {
+    console.error("❌ Error fixing paidAmount:", err);
+    process.exit(1);
+  }
+}
+
+// fixPaidAmounts();
+
 const routes = require("./routes/index");
 
 app.use(routes);
