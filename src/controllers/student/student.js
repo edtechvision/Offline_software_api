@@ -113,62 +113,69 @@ exports.createStudent = async (req, res) => {
     const savedStudent = await student.save();
 
     // Handle fees if courseDetails exists
-    if (studentData.courseDetails) {
-      const {
-        courseId,
-        batchId,
-        courseFee,
-        paymentType,
-        downPayment,
-        nextPaymentDueDate,
-        paymentMode,
-        transactionId,
-      } = studentData.courseDetails;
+   // Handle fees if courseDetails exists
+if (studentData.courseDetails) {
+  const {
+    courseId,
+    batchId,
+    courseFee,
+    paymentType,
+    downPayment,
+    nextPaymentDueDate,
+    paymentMode,
+    transactionId,
+  } = studentData.courseDetails;
 
-      if (paymentType === "EMI" && (!downPayment || !nextPaymentDueDate)) {
-        return res.status(400).json({
-          success: false,
-          message: "For EMI, downPayment and nextPaymentDueDate are required",
-        });
-      }
+  if (paymentType === "EMI" && (!downPayment || !nextPaymentDueDate)) {
+    return res.status(400).json({
+      success: false,
+      message: "For EMI, downPayment and nextPaymentDueDate are required",
+    });
+  }
 
-      if (paymentMode === "UPI" && !transactionId) {
-        return res.status(400).json({ success: false, message: "Transaction Id required" });
-      }
+  if (paymentMode === "UPI" && !transactionId) {
+    return res.status(400).json({ success: false, message: "Transaction Id required" });
+  }
 
-      const paidAmount = paymentType === "Full-Payment" ? courseFee : (downPayment || 0);
-      const pendingAmount = courseFee - paidAmount;
+  // ✅ Force numeric conversions here
+  const totalFee = Number(courseFee) || 0;
+  const paidAmount =
+    paymentType === "Full-Payment"
+      ? totalFee
+      : Number(downPayment) || 0;
+  const pendingAmount = totalFee - paidAmount;
 
-      const fee = new Fee({
-        studentId: savedStudent._id,
-        courseId,
-        batchId,
-        totalFee: courseFee,
-        paidAmount,
-        pendingAmount,
-        nextPaymentDueDate: paymentType === "EMI" ? nextPaymentDueDate : null,
-        status:
-          pendingAmount === 0 ? "Completed" : paidAmount > 0 ? "Partial" : "Pending",
-        paymentHistory:
-          paidAmount > 0
-            ? [
-                {
-                  amount: paidAmount,
-                  paymentMode,
-                  transactionId,
-                 pendingAmountAfterPayment: pendingAmount,
-                   receiptNo: generateReceiptNo(),
-                  remarks:
-                    paymentType === "Full-Payment"
-                      ? "Full Payment at Admission"
-                      : "Down Payment at Admission",
-                },
-              ]
-            : [],
-      });
+  const fee = new Fee({
+    studentId: savedStudent._id,
+    courseId,
+    batchId,
+    totalFee,
+    paidAmount,
+    pendingAmount,
+    nextPaymentDueDate: paymentType === "EMI" ? nextPaymentDueDate : null,
+    status:
+      pendingAmount === 0 ? "Completed" : paidAmount > 0 ? "Partial" : "Pending",
+    paymentHistory:
+      paidAmount > 0
+        ? [
+            {
+              amount: paidAmount,
+              paymentMode,
+              transactionId,
+              pendingAmountAfterPayment: pendingAmount,
+              receiptNo: generateReceiptNo(),
+              remarks:
+                paymentType === "Full-Payment"
+                  ? "Full Payment at Admission"
+                  : "Down Payment at Admission",
+            },
+          ]
+        : [],
+  });
 
-      await fee.save();
-    }
+  await fee.save();
+}
+
 
     res.status(201).json({ success: true, message: "Student created", data: savedStudent });
   } catch (error) {
