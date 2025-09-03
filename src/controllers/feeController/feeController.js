@@ -473,25 +473,30 @@ exports.revertPayment = async (req, res) => {
     // ✅ Get payment to revert
     const paymentToDelete = fee.paymentHistory[paymentIndex];
 
-    // ✅ Net effect (paid + fine only, discount handled separately)
-    const netAmount =
-      (paymentToDelete.amount || 0) + (paymentToDelete.fine || 0);
+    // ✅ Normalize all values to numbers (avoid NaN)
+    const totalFee = Number(fee.totalFee) || 0;
+    const paidAmount = Number(fee.paidAmount) || 0;
+    const totalDiscount = Number(fee.totalDiscount) || 0;
+
+    const amount = Number(paymentToDelete.amount) || 0;
+    const fine = Number(paymentToDelete.fine) || 0;
+    const discountAmount = Number(paymentToDelete.discountAmount) || 0;
+
+    // ✅ Net effect (paid + fine only, discount separate)
+    const netAmount = amount + fine;
 
     // ✅ Deduct paid amount
-    fee.paidAmount = Math.max(0, fee.paidAmount - netAmount);
+    fee.paidAmount = Math.max(0, paidAmount - netAmount);
 
     // ✅ Deduct discount from totalDiscount
-    if (paymentToDelete.discountAmount) {
-      fee.totalDiscount = Math.max(
-        0,
-        (Number(fee.totalDiscount) || 0) - Number(paymentToDelete.discountAmount)
-      );
+    if (discountAmount > 0) {
+      fee.totalDiscount = Math.max(0, totalDiscount - discountAmount);
     }
 
     // ✅ Recalculate pending = totalFee - (paid + discount)
     fee.pendingAmount = Math.max(
       0,
-      Number(fee.totalFee) - (fee.paidAmount + fee.totalDiscount)
+      totalFee - (fee.paidAmount + fee.totalDiscount)
     );
 
     // ✅ Remove payment from history
@@ -505,6 +510,15 @@ exports.revertPayment = async (req, res) => {
     } else {
       fee.status = "Pending";
     }
+
+    // 🔍 Debugging log (optional, can remove later)
+    console.log("Recalculated Fee values:", {
+      totalFee,
+      paidAmount: fee.paidAmount,
+      totalDiscount: fee.totalDiscount,
+      pendingAmount: fee.pendingAmount,
+      status: fee.status,
+    });
 
     const updatedFee = await fee.save();
 
@@ -521,6 +535,7 @@ exports.revertPayment = async (req, res) => {
     });
   }
 };
+
 
 exports.getPendingFees = async (req, res) => {
   try {
