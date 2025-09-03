@@ -1,6 +1,7 @@
 // controllers/feeController.js
 const Fee = require("../../models/Fee");
 const Student = require("../../models/Student");
+const s3 = require("../../utils/s3");
 
 // ✅ Create Fee Record for a Student
 exports.createFee = async (req, res) => {
@@ -57,30 +58,141 @@ function generateReceiptNo() {
   return `TBREC${randomNum}`;
 }
 
+// exports.addPayment = async (req, res) => {
+//   try {
+//     const { feeId, amount, paymentMode, transactionId, remarks } = req.body;
+
+//     const fee = await Fee.findById(feeId);
+//     if (!fee) {
+//       return res.status(404).json({ success: false, message: "Fee record not found" });
+//     }
+
+//     // ✅ Previous received amount before this payment
+//     const previousReceivedAmount = fee.paidAmount || 0;
+
+//     // ✅ Update payment totals
+//     fee.paidAmount += amount;
+//     fee.pendingAmount = Math.max(0, fee.totalFee - fee.paidAmount);
+
+//     // ✅ Add payment history with previousReceivedAmount & receiptNo
+//     fee.paymentHistory.push({
+//       amount,
+//       previousReceivedAmount,
+//       pendingAmountAfterPayment: fee.pendingAmount, // ✅ Corrected
+//       paymentMode,
+//       transactionId,
+//       remarks,
+//       receiptNo: generateReceiptNo(),
+//     });
+
+//     // ✅ Update status
+//     if (fee.pendingAmount === 0) {
+//       fee.status = "Completed";
+//     } else if (fee.paidAmount > 0) {
+//       fee.status = "Partial";
+//     } else {
+//       fee.status = "Pending";
+//     }
+
+//     const updatedFee = await fee.save();
+
+//     res.status(200).json({
+//       success: true,
+//       message: "Payment added successfully",
+//       data: updatedFee,
+//     });
+//   } catch (error) {
+//     console.error("Error adding payment:", error);
+//     res.status(500).json({
+//       success: false,
+//       message: "Internal server error",
+//     });
+//   }
+// };
+
+
+// ✅ Get Fees by Student
+// exports.getStudentFees = async (req, res) => {
+//   try {
+//     const { studentId } = req.params;
+
+//     const fees = await Fee.find({ studentId })
+//       .populate("studentId", "studentName className registrationNo")
+//       .populate("courseId", "name fee")
+//       .populate("batchId", "batchName");
+
+//     res.status(200).json({
+//       success: true,
+//       message: "Student fees retrieved successfully",
+//       data: fees,
+//     });
+//   } catch (error) {
+//     console.error("Error fetching student fees:", error);
+//     res.status(500).json({
+//       success: false,
+//       message: "Internal server error",
+//     });
+//   }
+// };
+
+
 exports.addPayment = async (req, res) => {
   try {
-    const { feeId, amount, paymentMode, transactionId, remarks } = req.body;
+    const {
+      feeId,
+      amount,
+      paymentMode,
+      transactionId,
+      remarks,
+      paymentDate,
+      discountCode,
+      discountAmount = 0,
+      fine = 0,
+    } = req.body;
 
     const fee = await Fee.findById(feeId);
     if (!fee) {
-      return res.status(404).json({ success: false, message: "Fee record not found" });
+      return res
+        .status(404)
+        .json({ success: false, message: "Fee record not found" });
     }
 
     // ✅ Previous received amount before this payment
     const previousReceivedAmount = fee.paidAmount || 0;
 
-    // ✅ Update payment totals
-    fee.paidAmount += amount;
+    // ✅ Update payment totals (consider fine and discount)
+    const netAmount = amount + fine - discountAmount;
+    fee.paidAmount += netAmount;
     fee.pendingAmount = Math.max(0, fee.totalFee - fee.paidAmount);
 
-    // ✅ Add payment history with previousReceivedAmount & receiptNo
+    // ✅ Handle optional discount file upload
+    let discountFileUrl = null;
+    if (req.file) {
+      const params = {
+        Bucket: process.env.DO_SPACE_BUCKET, // your bucket name
+        Key: `discounts/${Date.now()}_${req.file.originalname}`, // file path
+        Body: req.file.buffer,
+        ACL: "public-read", // so it's accessible
+        ContentType: req.file.mimetype,
+      };
+
+      const uploaded = await s3.upload(params).promise();
+      discountFileUrl = uploaded.Location; // store file URL
+    }
+
+    // ✅ Add payment history
     fee.paymentHistory.push({
       amount,
+      fine,
+      discountCode,
+      discountAmount,
+      discountFile: discountFileUrl, // ✅ store file url if uploaded
       previousReceivedAmount,
-      pendingAmountAfterPayment: fee.pendingAmount, // ✅ Corrected
+      pendingAmountAfterPayment: fee.pendingAmount,
       paymentMode,
       transactionId,
       remarks,
+      paymentDate: paymentDate || Date.now(),
       receiptNo: generateReceiptNo(),
     });
 
@@ -108,31 +220,6 @@ exports.addPayment = async (req, res) => {
     });
   }
 };
-
-
-// ✅ Get Fees by Student
-// exports.getStudentFees = async (req, res) => {
-//   try {
-//     const { studentId } = req.params;
-
-//     const fees = await Fee.find({ studentId })
-//       .populate("studentId", "studentName className registrationNo")
-//       .populate("courseId", "name fee")
-//       .populate("batchId", "batchName");
-
-//     res.status(200).json({
-//       success: true,
-//       message: "Student fees retrieved successfully",
-//       data: fees,
-//     });
-//   } catch (error) {
-//     console.error("Error fetching student fees:", error);
-//     res.status(500).json({
-//       success: false,
-//       message: "Internal server error",
-//     });
-//   }
-// };
 
 exports.getStudentFees = async (req, res) => {
   try {
@@ -249,7 +336,9 @@ exports.revertPayment = async (req, res) => {
 
     const fee = await Fee.findById(feeId);
     if (!fee) {
-      return res.status(404).json({ success: false, message: "Fee record not found" });
+      return res
+        .status(404)
+        .json({ success: false, message: "Fee record not found" });
     }
 
     // ✅ Find payment by receiptNo
@@ -258,14 +347,22 @@ exports.revertPayment = async (req, res) => {
     );
 
     if (paymentIndex === -1) {
-      return res.status(404).json({ success: false, message: "Payment record not found" });
+      return res
+        .status(404)
+        .json({ success: false, message: "Payment record not found" });
     }
 
     // ✅ Get payment to delete
     const paymentToDelete = fee.paymentHistory[paymentIndex];
 
+    // ✅ Calculate net effect (what was actually added to paidAmount)
+    const netAmount =
+      (paymentToDelete.amount || 0) +
+      (paymentToDelete.fine || 0) -
+      (paymentToDelete.discountAmount || 0);
+
     // ✅ Deduct from totals
-    fee.paidAmount = Math.max(0, fee.paidAmount - paymentToDelete.amount);
+    fee.paidAmount = Math.max(0, fee.paidAmount - netAmount);
     fee.pendingAmount = Math.max(0, fee.totalFee - fee.paidAmount);
 
     // ✅ Remove payment from history
@@ -295,6 +392,7 @@ exports.revertPayment = async (req, res) => {
     });
   }
 };
+
 
 
 exports.getPendingFees = async (req, res) => {

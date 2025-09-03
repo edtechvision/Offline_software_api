@@ -38,6 +38,11 @@ const feeSchema = new mongoose.Schema(
     paymentHistory: [
       {
         amount: Number,
+                fine: { type: Number, default: 0 }, // ✅ Fine added
+        discountCode: { type: String }, // ✅ Discount code
+        discountAmount: { type: Number, default: 0 }, // ✅ Discount amount
+    discountFile: { type: String }, // ✅ URL of uploaded file
+
         previousReceivedAmount: { type: Number, default: 0 }, // ✅ new field
     pendingAmountAfterPayment: { type: Number, default: 0 }, // ✅ new field
 
