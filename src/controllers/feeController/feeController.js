@@ -398,7 +398,7 @@ exports.revertPayment = async (req, res) => {
 exports.getPendingFees = async (req, res) => {
   try {
     const fees = await Fee.find({ pendingAmount: { $gt: 0 } }) // only students with pending fees
-      .populate("studentId", "studentName registrationNo mobileNumber")
+      .populate("studentId", "studentName registrationNo mobileNumber email")
       .populate("courseId", "name");
 
     if (!fees || fees.length === 0) {
@@ -408,6 +408,7 @@ exports.getPendingFees = async (req, res) => {
     const pendingFeesList = fees.map((fee) => ({
       studentId: fee.studentId?._id,
       studentName: fee.studentId?.studentName,
+      studentEmail: fee.studentId?.email,
       registrationNo: fee.studentId?.registrationNo,
       contactNumber: fee.studentId?.mobileNumber,
       courseName: fee.courseId?.name,
@@ -441,20 +442,18 @@ exports.getCollectFeesStudents = async (req, res) => {
       search = '',
       sortBy = 'createdAt',
       sortOrder = 'desc',
-      batchId,         // ✅ new filter
-      courseId,         // ✅ new filter
-      className        // ✅ new filter
+      batchId,
+      courseId,
+      className
     } = req.query;
 
-    // Parse pagination parameters
     const pageNum = parseInt(page);
     const limitNum = parseInt(limit);
     const skip = (pageNum - 1) * limitNum;
 
     // Build search + filter query
     const searchQuery = {};
-    
-    // Apply search
+
     if (search) {
       const searchRegex = new RegExp(search, 'i');
       searchQuery.$or = [
@@ -473,42 +472,63 @@ exports.getCollectFeesStudents = async (req, res) => {
       ];
     }
 
-    // ✅ Apply batch filter
     if (batchId) {
       searchQuery["courseDetails.batchId"] = batchId;
     }
     if (courseId) {
       searchQuery["courseDetails.courseId"] = courseId;
     }
-
-    // ✅ Apply class filter
     if (className) {
       searchQuery["className"] = className;
     }
 
-    // Build sort object
+    // Sort
     const sortOptions = {};
     sortOptions[sortBy] = sortOrder === 'desc' ? -1 : 1;
 
-    // Execute query with pagination
+    // ✅ Fetch students with filters + populate course/batch
     const students = await Student.find(searchQuery)
       .sort(sortOptions)
       .skip(skip)
       .limit(limitNum)
-      .select('-__v')
-      .populate("courseDetails.courseId", "name fee")
-      .populate("courseDetails.additionalCourseId", "name")
-      .populate("courseDetails.batchId", "batchName")
-      .populate("centerId", "centerName centerHeadName");
-    // Get total count for pagination info
+      .select('studentName fathersName mobileNumber className courseDetails')
+      .populate("courseDetails.courseId", "name")
+      .populate("courseDetails.batchId", "batchName");
+
+    // ✅ Fetch fee data for these students
+    const studentIds = students.map(s => s._id);
+    const fees = await Fee.find({ studentId: { $in: studentIds } })
+      .select('studentId totalFee paidAmount pendingAmount');
+
+    const feeMap = {};
+    fees.forEach(fee => {
+      feeMap[fee.studentId.toString()] = fee;
+    });
+
+    // ✅ Transform final response
+    const result = students.map(s => {
+      const fee = feeMap[s._id.toString()] || {};
+      return {
+        studentName: s.studentName,
+        fathersName: s.fathersName,
+        mobileNumber: s.mobileNumber,
+        className: s.className,
+        course: s.courseDetails?.courseId?.name || "-",
+        batch: s.courseDetails?.batchId?.batchName || "-",
+        totalFee: fee.totalFee || 0,
+        paidAmount: fee.paidAmount || 0,
+        pendingAmount: fee.pendingAmount || 0
+      };
+    });
+
     const totalStudents = await Student.countDocuments(searchQuery);
     const totalPages = Math.ceil(totalStudents / limitNum);
 
     res.status(200).json({
       success: true,
-      message: 'Students retrieved successfully',
+      message: 'Students fee collection data retrieved successfully',
       data: {
-        students,
+        students: result,
         pagination: {
           currentPage: pageNum,
           totalPages,
@@ -519,9 +539,8 @@ exports.getCollectFeesStudents = async (req, res) => {
         }
       }
     });
-
   } catch (error) {
-    console.error('Error fetching students:', error);
+    console.error('Error fetching students fee collection:', error);
     res.status(500).json({
       success: false,
       message: 'Internal server error'
