@@ -447,7 +447,6 @@ exports.getAllPayments = async (req, res) => {
 //     });
 //   }
 // };
-
 exports.revertPayment = async (req, res) => {
   try {
     const { feeId, receiptNo } = req.body;
@@ -473,7 +472,7 @@ exports.revertPayment = async (req, res) => {
     // ✅ Get payment to revert
     const paymentToDelete = fee.paymentHistory[paymentIndex];
 
-    // ✅ Normalize all values to numbers (avoid NaN)
+    // ✅ Normalize all values to numbers
     const totalFee = Number(fee.totalFee) || 0;
     const paidAmount = Number(fee.paidAmount) || 0;
     const totalDiscount = Number(fee.totalDiscount) || 0;
@@ -482,22 +481,25 @@ exports.revertPayment = async (req, res) => {
     const fine = Number(paymentToDelete.fine) || 0;
     const discountAmount = Number(paymentToDelete.discountAmount) || 0;
 
-    // ✅ Net effect (paid + fine only, discount separate)
+    // ✅ Net effect (paid + fine only, discount handled separately)
     const netAmount = amount + fine;
 
-    // ✅ Deduct paid amount
-    fee.paidAmount = Math.max(0, paidAmount - netAmount);
+    // ✅ Deduct paid amount (never NaN)
+    const updatedPaidAmount = Math.max(0, paidAmount - netAmount);
+    fee.paidAmount = updatedPaidAmount;
 
-    // ✅ Deduct discount from totalDiscount
+    // ✅ Deduct discount from totalDiscount (never NaN)
+    let updatedDiscount = totalDiscount;
     if (discountAmount > 0) {
-      fee.totalDiscount = Math.max(0, totalDiscount - discountAmount);
+      updatedDiscount = Math.max(0, totalDiscount - discountAmount);
     }
+    fee.totalDiscount = updatedDiscount;
 
-    // ✅ Recalculate pending = totalFee - (paid + discount)
-    fee.pendingAmount = Math.max(
-      0,
-      totalFee - (fee.paidAmount + fee.totalDiscount)
-    );
+    // ✅ Recalculate pending safely
+    const recalculatedPending =
+      totalFee - (updatedPaidAmount + updatedDiscount);
+
+    fee.pendingAmount = Math.max(0, Number(recalculatedPending) || 0);
 
     // ✅ Remove payment from history
     fee.paymentHistory.splice(paymentIndex, 1);
@@ -511,7 +513,7 @@ exports.revertPayment = async (req, res) => {
       fee.status = "Pending";
     }
 
-    // 🔍 Debugging log (optional, can remove later)
+    // 🔍 Debugging log (safe calculation values)
     console.log("Recalculated Fee values:", {
       totalFee,
       paidAmount: fee.paidAmount,
@@ -535,6 +537,8 @@ exports.revertPayment = async (req, res) => {
     });
   }
 };
+
+
 
 
 exports.getPendingFees = async (req, res) => {
