@@ -15,6 +15,7 @@ const {
   generateQRCode,
 } = require("./studentUtils");
 const Center = require('../../models/Center');
+const createFeeRecord = require('../../helpers/createFeeRecord');
 
 function generateReceiptNo() {
   const randomNum = Math.floor(10000 + Math.random() * 90000); // 5-digit random number
@@ -392,13 +393,13 @@ exports.createStudent = async (req, res) => {
     // attach centerId
     studentData.centerId = center._id;
 
-    // Generate registration number
+    // ✅ Generate registration number
     studentData.registrationNo = await generateRegistrationNo(
       Student,
       studentData.className
     );
 
-    // Required fields validation (Aadhar & Email optional)
+    // ✅ Required fields validation
     const requiredFields = [
       "centerCode",
       "inchargeCode",
@@ -426,16 +427,34 @@ exports.createStudent = async (req, res) => {
     if (studentData.email) {
       const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
       if (!emailRegex.test(studentData.email)) {
-        return res.status(400).json({ success: false, message: "Invalid email format" });
+        return res
+          .status(400)
+          .json({ success: false, message: "Invalid email format" });
       }
     }
 
     // ✅ Parse JSON fields safely
     try {
-      studentData.presentAddress = parseJsonField(studentData.presentAddress, "presentAddress");
-      studentData.permanentAddress = parseJsonField(studentData.permanentAddress, "permanentAddress");
+      studentData.presentAddress = parseJsonField(
+        studentData.presentAddress,
+        "presentAddress"
+      );
+      studentData.permanentAddress = parseJsonField(
+        studentData.permanentAddress,
+        "permanentAddress"
+      );
       if (studentData.courseDetails) {
-        studentData.courseDetails = parseJsonField(studentData.courseDetails, "courseDetails");
+        studentData.courseDetails = parseJsonField(
+          studentData.courseDetails,
+          "courseDetails"
+        );
+
+        // Normalize empty strings → null
+        Object.keys(studentData.courseDetails).forEach((key) => {
+          if (studentData.courseDetails[key] === "") {
+            studentData.courseDetails[key] = null;
+          }
+        });
       }
     } catch (err) {
       return res.status(400).json({ success: false, message: err.message });
@@ -452,7 +471,9 @@ exports.createStudent = async (req, res) => {
         const { image } = await uploadImage(req.file);
         studentData.image = image;
       } catch {
-        return res.status(500).json({ success: false, message: "Failed to upload image" });
+        return res
+          .status(500)
+          .json({ success: false, message: "Failed to upload image" });
       }
     }
 
@@ -461,105 +482,36 @@ exports.createStudent = async (req, res) => {
       studentData.qrCode = await generateQRCode(studentData.registrationNo);
       studentData.qrCodeData = studentData.registrationNo;
     } catch {
-      return res.status(500).json({ success: false, message: "Failed to generate QR Code" });
+      return res
+        .status(500)
+        .json({ success: false, message: "Failed to generate QR Code" });
     }
 
-    // Save student
+    // ✅ Save student
     const student = new Student(studentData);
     const savedStudent = await student.save();
 
-    // ✅ Handle fees ONLY if courseDetails exists
+    // ✅ Handle fee creation (course is required)
     if (studentData.courseDetails) {
-      let {
-        courseId,
-        batchId,
-        courseFee,
-        paymentType,
-        downPayment,
-        nextPaymentDueDate,
-        paymentMode,
-        transactionId,
-        additionalCourseId,
-        referenceNumber,
-      } = studentData.courseDetails;
-
-      // Normalize empty strings → null
-      if (transactionId === "") transactionId = null;
-      if (additionalCourseId === "") additionalCourseId = null;
-      if (referenceNumber === "") referenceNumber = null;
-
-      // ✅ EMI validation
-      if (paymentType === "EMI" && (!downPayment || !nextPaymentDueDate)) {
-        return res.status(400).json({
-          success: false,
-          message: "For EMI, downPayment and nextPaymentDueDate are required",
-        });
-      }
-
-      // ✅ PaymentMode validation
-      if (paymentMode === "UPI" && !transactionId) {
-        return res.status(400).json({
-          success: false,
-          message: "Transaction Id required",
-        });
-      }
-
-      // ✅ Fee calculation validations
-      const totalFee = Number(courseFee) || 0;
-      const paidAmount = paymentType === "Full-Payment" ? totalFee : Number(downPayment) || 0;
-
-      if (paidAmount > totalFee) {
-        return res.status(400).json({
-          success: false,
-          message: "Down payment cannot be greater than total course fee",
-        });
-      }
-
-      const pendingAmount = totalFee - paidAmount;
-
-      const fee = new Fee({
-        studentId: savedStudent._id,
-        courseId,
-        batchId,
-        totalFee,
-        paidAmount,
-        pendingAmount,
-        nextPaymentDueDate: paymentType === "EMI" ? nextPaymentDueDate : null,
-        status:
-          pendingAmount === 0 ? "Completed" : paidAmount > 0 ? "Partial" : "Pending",
-        paymentHistory:
-          paidAmount > 0
-            ? [
-                {
-                  amount: paidAmount,
-                  paymentMode,
-                  transactionId,
-                  pendingAmountAfterPayment: pendingAmount,
-                  receiptNo: generateReceiptNo(),
-                  remarks:
-                    paymentType === "Full-Payment"
-                      ? "Full Payment at Admission"
-                      : "Down Payment at Admission",
-                },
-              ]
-            : [],
-      });
-
       try {
-        await fee.save();
+        await createFeeRecord(savedStudent, studentData.courseDetails);
       } catch (err) {
         return res.status(400).json({
           success: false,
-          message: "Failed to save fee record",
-          error: err.message,
+          message: err.message || "Failed to save fee record",
         });
       }
+    } else {
+      return res.status(400).json({
+        success: false,
+        message: "Course is required. Please select a course.",
+      });
     }
 
     // ✅ Final success response
     res.status(201).json({
       success: true,
-      message: "Student created",
+      message: "Student created successfully",
       data: savedStudent,
     });
   } catch (error) {
@@ -577,7 +529,9 @@ exports.createStudent = async (req, res) => {
         errors,
       });
     }
-    res.status(500).json({ success: false, message: "Internal server error" });
+    res
+      .status(500)
+      .json({ success: false, message: "Internal server error" });
   }
 };
 
@@ -810,6 +764,7 @@ exports.createStudent = async (req, res) => {
 //   }
 // };
 
+
 exports.updateStudent = async (req, res) => {
   try {
     const { id } = req.params;
@@ -817,7 +772,9 @@ exports.updateStudent = async (req, res) => {
 
     const existingStudent = await Student.findById(id);
     if (!existingStudent) {
-      return res.status(404).json({ success: false, message: "Student not found" });
+      return res
+        .status(404)
+        .json({ success: false, message: "Student not found" });
     }
 
     // ✅ Safe JSON parsing (only if provided)
@@ -842,13 +799,14 @@ exports.updateStudent = async (req, res) => {
           "courseDetails",
           existingStudent.courseDetails
         );
-      }
-      Object.keys(updateData.courseDetails).forEach((key) => {
-  if (updateData.courseDetails[key] === "") {
-    updateData.courseDetails[key] = null;
-  }
-});
 
+        // Normalize empty strings → null
+        Object.keys(updateData.courseDetails).forEach((key) => {
+          if (updateData.courseDetails[key] === "") {
+            updateData.courseDetails[key] = null;
+          }
+        });
+      }
     } catch (err) {
       return res.status(400).json({ success: false, message: err.message });
     }
@@ -874,7 +832,9 @@ exports.updateStudent = async (req, res) => {
     if (updateData.email) {
       const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
       if (!emailRegex.test(updateData.email)) {
-        return res.status(400).json({ success: false, message: "Invalid email format" });
+        return res
+          .status(400)
+          .json({ success: false, message: "Invalid email format" });
       }
     }
 
@@ -888,7 +848,9 @@ exports.updateStudent = async (req, res) => {
         const { image } = await uploadImage(req.file);
         updateData.image = image;
       } catch {
-        return res.status(500).json({ success: false, message: "Failed to upload image" });
+        return res
+          .status(500)
+          .json({ success: false, message: "Failed to upload image" });
       }
     }
 
@@ -899,79 +861,15 @@ exports.updateStudent = async (req, res) => {
       updateData.courseDetails.courseId.toString() !==
         existingStudent.courseDetails?.courseId?.toString()
     ) {
-      const {
-        courseId,
-        batchId,
-        courseFee,
-        paymentType,
-        downPayment,
-        nextPaymentDueDate,
-        paymentMode,
-        transactionId,
-      } = updateData.courseDetails;
-
-      if (Number(downPayment) > Number(courseFee)) {
-  return res.status(400).json({
-    success: false,
-    message: "Down payment cannot be greater than total course fee",
-  });
-}
-
-
-      // Validation
-      if (paymentType === "EMI" && (!downPayment || !nextPaymentDueDate)) {
+      try {
+        // Reuse helper for fee record creation
+        await createFeeRecord(existingStudent, updateData.courseDetails);
+      } catch (err) {
         return res.status(400).json({
           success: false,
-          message: "For EMI, downPayment and nextPaymentDueDate are required",
+          message: err.message || "Failed to update fee record",
         });
       }
-      if (paymentMode === "UPI" && !transactionId) {
-        return res.status(400).json({
-          success: false,
-          message: "Transaction Id required",
-        });
-      }
-
-      // Common fee calculations
-      const totalFee = Number(courseFee) || 0;
-      const paidAmount = paymentType === "Full-Payment" ? totalFee : Number(downPayment) || 0;
-      const pendingAmount = totalFee - paidAmount;
-
-      let fee = await Fee.findOne({ studentId: existingStudent._id });
-
-      if (!fee) {
-        // ✅ Create new fee record
-        fee = new Fee({ studentId: existingStudent._id });
-      }
-
-      // Update / reset fee details
-      fee.courseId = courseId;
-      fee.batchId = batchId;
-      fee.totalFee = totalFee;
-      fee.paidAmount = paidAmount;
-      fee.pendingAmount = pendingAmount;
-      fee.nextPaymentDueDate = paymentType === "EMI" ? nextPaymentDueDate : null;
-      fee.status =
-        pendingAmount === 0 ? "Completed" : paidAmount > 0 ? "Partial" : "Pending";
-
-      fee.paymentHistory =
-        paidAmount > 0
-          ? [
-              {
-                amount: paidAmount,
-                paymentMode,
-                transactionId,
-                pendingAmountAfterPayment: pendingAmount,
-                receiptNo: generateReceiptNo(),
-                remarks:
-                  paymentType === "Full-Payment"
-                    ? "Full Payment at Admission"
-                    : "Down Payment at Admission",
-              },
-            ]
-          : [];
-
-      await fee.save();
     }
 
     // ✅ Regenerate QR if regNo changed
@@ -983,7 +881,9 @@ exports.updateStudent = async (req, res) => {
         updateData.qrCode = await generateQRCode(updateData.registrationNo);
         updateData.qrCodeData = updateData.registrationNo;
       } catch {
-        return res.status(500).json({ success: false, message: "Failed to generate QR Code" });
+        return res
+          .status(500)
+          .json({ success: false, message: "Failed to generate QR Code" });
       }
     }
 
@@ -1013,7 +913,9 @@ exports.updateStudent = async (req, res) => {
         errors,
       });
     }
-    res.status(500).json({ success: false, message: "Internal server error" });
+    res
+      .status(500)
+      .json({ success: false, message: "Internal server error" });
   }
 };
 
