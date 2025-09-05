@@ -290,6 +290,7 @@ exports.addPayment = async (req, res) => {
       fine = 0,
       collectedBy, // ✅ "Admin" or "Incharge"
       inchargeCode, // ✅ optional
+      nextPaymentDueDate, // ✅ optional update
     } = req.body;
 
     const fee = await Fee.findById(feeId);
@@ -349,6 +350,11 @@ exports.addPayment = async (req, res) => {
       inchargeCode: collectedBy === "Incharge" ? inchargeCode : null,
     });
 
+    
+    // ✅ Update nextPaymentDueDate if provided
+    if (nextPaymentDueDate) {
+      fee.nextPaymentDueDate = nextPaymentDueDate;
+    }
     fee.status = fee.pendingAmount === 0 ? "Completed" : fee.paidAmount > 0 ? "Partial" : "Pending";
     const updatedFee = await fee.save();
 
