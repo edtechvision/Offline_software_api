@@ -1,4 +1,5 @@
 // controllers/feeController.js
+const AdmissionIncharge = require("../../models/AdmissionIncharge");
 const Fee = require("../../models/Fee");
 const Student = require("../../models/Student");
 const s3 = require("../../utils/s3");
@@ -276,6 +277,100 @@ function generateReceiptNo() {
 // };
 
 
+// exports.addPayment = async (req, res) => {
+//   try {
+//     const {
+//       feeId,
+//       amount,
+//       paymentMode,
+//       transactionId,
+//       remarks,
+//       paymentDate,
+//       discountCode,
+//       discountAmount = 0,
+//       fine = 0,
+//       collectedBy, // ✅ "Admin" or "Incharge"
+//       inchargeCode, // ✅ optional
+//       nextPaymentDueDate, // ✅ optional update
+//     } = req.body;
+
+//     const fee = await Fee.findById(feeId);
+//     if (!fee) {
+//       return res.status(404).json({ success: false, message: "Fee record not found" });
+//     }
+
+//     if (!["Admin", "Incharge"].includes(collectedBy)) {
+//       return res.status(400).json({ success: false, message: "Invalid collectedBy value" });
+//     }
+
+//     if (collectedBy === "Incharge" && !inchargeCode) {
+//       return res.status(400).json({ success: false, message: "Incharge code is required when collectedBy is Incharge" });
+//     }
+
+//     const prevPaid = Number(fee.paidAmount) || 0;
+//     const amt = Number(amount) || 0;
+//     const extraFine = Number(fine) || 0;
+//     const effectiveDiscount = Number(discountAmount) || 0;
+
+//     const previousReceivedAmount = prevPaid;
+//     const netAmount = amt + extraFine;
+
+//     fee.paidAmount = prevPaid + netAmount;
+//     fee.totalDiscount = (Number(fee.totalDiscount) || 0) + effectiveDiscount;
+//     fee.pendingAmount = Math.max(0, Number(fee.totalFee) - (fee.paidAmount + fee.totalDiscount));
+
+//     let discountFileUrl = null;
+//     if (req.file) {
+//       const params = {
+//         Bucket: process.env.DO_SPACE_BUCKET,
+//         Key: `discounts/${Date.now()}_${req.file.originalname}`,
+//         Body: req.file.buffer,
+//         ACL: "public-read",
+//         ContentType: req.file.mimetype,
+//       };
+//       const uploaded = await s3.upload(params).promise();
+//       discountFileUrl = uploaded.Location;
+//     }
+
+//     fee.paymentHistory.push({
+//       amount: amt,
+//       fine: extraFine,
+//       discountCode,
+//       discountAmount: effectiveDiscount,
+//       discountFile: discountFileUrl,
+//       previousReceivedAmount,
+//       pendingAmountAfterPayment: fee.pendingAmount,
+//       paymentMode,
+//       transactionId,
+//       remarks,
+//       paymentDate: paymentDate || Date.now(),
+//       receiptNo: generateReceiptNo(),
+
+//       // ✅ new tracking fields
+//       collectedBy,
+//       inchargeCode: collectedBy === "Incharge" ? inchargeCode : null,
+//     });
+
+    
+//     // ✅ Update nextPaymentDueDate if provided
+//     if (nextPaymentDueDate) {
+//       fee.nextPaymentDueDate = nextPaymentDueDate;
+//     }
+//     fee.status = fee.pendingAmount === 0 ? "Completed" : fee.paidAmount > 0 ? "Partial" : "Pending";
+//     const updatedFee = await fee.save();
+
+//     res.status(200).json({
+//       success: true,
+//       message: "Payment added successfully",
+//       data: updatedFee,
+//     });
+//   } catch (error) {
+//     console.error("Error adding payment:", error);
+//     res.status(500).json({ success: false, message: "Internal server error" });
+//   }
+// };
+
+
 exports.addPayment = async (req, res) => {
   try {
     const {
@@ -288,7 +383,7 @@ exports.addPayment = async (req, res) => {
       discountCode,
       discountAmount = 0,
       fine = 0,
-      collectedBy, // ✅ "Admin" or "Incharge"
+      collectedBy, // ✅ "Admin" or undefined (when Incharge)
       inchargeCode, // ✅ optional
       nextPaymentDueDate, // ✅ optional update
     } = req.body;
@@ -298,12 +393,33 @@ exports.addPayment = async (req, res) => {
       return res.status(404).json({ success: false, message: "Fee record not found" });
     }
 
-    if (!["Admin", "Incharge"].includes(collectedBy)) {
-      return res.status(400).json({ success: false, message: "Invalid collectedBy value" });
-    }
+    let collectedByName = null;
+    let inchargeCodeValue = null;
 
-    if (collectedBy === "Incharge" && !inchargeCode) {
-      return res.status(400).json({ success: false, message: "Incharge code is required when collectedBy is Incharge" });
+    if (collectedBy === "Admin") {
+      // ✅ Admin payment
+      collectedByName = "Admin";
+    } else if (inchargeCode) {
+      // ✅ Incharge payment → find by code
+      const incharge = await AdmissionIncharge.findOne({
+        incharge_code: inchargeCode,
+        isBlocked: false,
+      });
+
+      if (!incharge) {
+        return res.status(404).json({
+          success: false,
+          message: "Incharge not found for given code",
+        });
+      }
+
+      collectedByName = incharge.incharge_name;
+      inchargeCodeValue = incharge.incharge_code;
+    } else {
+      return res.status(400).json({
+        success: false,
+        message: "Either collectedBy=Admin or valid inchargeCode is required",
+      });
     }
 
     const prevPaid = Number(fee.paidAmount) || 0;
@@ -316,7 +432,10 @@ exports.addPayment = async (req, res) => {
 
     fee.paidAmount = prevPaid + netAmount;
     fee.totalDiscount = (Number(fee.totalDiscount) || 0) + effectiveDiscount;
-    fee.pendingAmount = Math.max(0, Number(fee.totalFee) - (fee.paidAmount + fee.totalDiscount));
+    fee.pendingAmount = Math.max(
+      0,
+      Number(fee.totalFee) - (fee.paidAmount + fee.totalDiscount)
+    );
 
     let discountFileUrl = null;
     if (req.file) {
@@ -345,17 +464,23 @@ exports.addPayment = async (req, res) => {
       paymentDate: paymentDate || Date.now(),
       receiptNo: generateReceiptNo(),
 
-      // ✅ new tracking fields
-      collectedBy,
-      inchargeCode: collectedBy === "Incharge" ? inchargeCode : null,
+      // ✅ Save collectedBy as name (Admin / incharge_name)
+      collectedBy: collectedByName,
+      inchargeCode: inchargeCodeValue,
     });
 
-    
     // ✅ Update nextPaymentDueDate if provided
     if (nextPaymentDueDate) {
       fee.nextPaymentDueDate = nextPaymentDueDate;
     }
-    fee.status = fee.pendingAmount === 0 ? "Completed" : fee.paidAmount > 0 ? "Partial" : "Pending";
+
+    fee.status =
+      fee.pendingAmount === 0
+        ? "Completed"
+        : fee.paidAmount > 0
+        ? "Partial"
+        : "Pending";
+
     const updatedFee = await fee.save();
 
     res.status(200).json({
@@ -368,7 +493,6 @@ exports.addPayment = async (req, res) => {
     res.status(500).json({ success: false, message: "Internal server error" });
   }
 };
-
 
 
 exports.getStudentFees = async (req, res) => {
@@ -385,6 +509,22 @@ exports.getStudentFees = async (req, res) => {
         success: false,
         message: "No fee records found for this student",
       });
+    }
+
+    // 🔍 Enrich paymentHistory with incharge_name
+    for (let fee of fees) {
+      for (let payment of fee.paymentHistory) {
+        if (payment.inchargeCode) {
+          const incharge = await AdmissionIncharge.findOne(
+            { incharge_code: payment.inchargeCode },
+            "incharge_name"
+          );
+          if (incharge) {
+            payment = payment.toObject ? payment.toObject() : payment;
+            payment.inchargeName = incharge.incharge_name;
+          }
+        }
+      }
     }
 
     res.status(200).json({
