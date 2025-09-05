@@ -104,7 +104,7 @@ function generateReceiptNo() {
 
 //   return await fee.save();
 // }
-async function createFeeRecord(student, courseDetails, file) {
+async function createFeeRecord(student, courseDetails, file,inchargeCode) {
   if (!courseDetails || !courseDetails.courseId) {
     throw new Error("Course is required. Please select a course.");
   }
@@ -182,6 +182,7 @@ async function createFeeRecord(student, courseDetails, file) {
     discountCode,
     discountFile: discountFileUrl,
     nextPaymentDueDate: paymentType === "EMI" ? nextPaymentDueDate : null,
+    inchargeCode,
     status:
       pendingAmount === 0 ? "Completed" : paidAmount > 0 ? "Partial" : "Pending",
     paymentHistory:

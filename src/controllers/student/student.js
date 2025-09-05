@@ -487,7 +487,7 @@ exports.createStudent = async (req, res) => {
     if (studentData.courseDetails) {
       try {
         const discountFile = req.files?.discountFile ? req.files.discountFile[0] : null;
-        await createFeeRecord(savedStudent, studentData.courseDetails, discountFile);
+        await createFeeRecord(savedStudent, studentData.courseDetails, discountFile, studentData.inchargeCode );
       } catch (err) {
         return res.status(400).json({
           success: false,
@@ -853,12 +853,74 @@ exports.updateStudent = async (req, res) => {
         existingStudent.courseDetails?.courseId?.toString()
     ) {
       try {
-        await Fee.deleteMany({ studentId: existingStudent._id });
-           const discountFile = req.files?.discountFile
-      ? req.files.discountFile[0]
-      : null;
-        // Reuse helper for fee record creation
-    await createFeeRecord(existingStudent, updateData.courseDetails, discountFile);
+        const discountFile = req.files?.discountFile
+          ? req.files.discountFile[0]
+          : null;
+
+        const feeRecord = await Fee.findOne({ studentId: existingStudent._id });
+
+        if (!feeRecord) {
+          // If no fee exists, create a new one
+          await createFeeRecord(
+            existingStudent,
+            updateData.courseDetails,
+            discountFile,
+            updateData.inchargeCode
+          );
+        } else {
+          // ✅ Update existing fee record instead of deleting
+          let {
+            courseId,
+            batchId,
+            courseFee,
+            paymentType,
+            nextPaymentDueDate,
+            discountCode,
+            discountAmount = 0,
+          } = updateData.courseDetails;
+
+          // Keep old payment history
+          const oldPayments = feeRecord.paymentHistory || [];
+          const alreadyPaid = oldPayments.reduce(
+            (sum, p) => sum + (p.amount || 0),
+            0
+          );
+          const oldDiscount = oldPayments.reduce(
+            (sum, p) => sum + (p.discountAmount || 0),
+            0
+          );
+
+          const totalFee = Number(courseFee) || 0;
+          const newDiscount = Number(discountAmount) || 0;
+
+          // Net pending = totalFee - (alreadyPaid + discounts)
+          const pendingAmount =
+            totalFee - (alreadyPaid + oldDiscount + newDiscount);
+
+          feeRecord.courseId = courseId;
+          feeRecord.batchId = batchId;
+          feeRecord.totalFee = totalFee;
+          feeRecord.totalDiscount = oldDiscount + newDiscount;
+          feeRecord.pendingAmount = pendingAmount;
+          feeRecord.discountCode = discountCode || feeRecord.discountCode;
+          feeRecord.nextPaymentDueDate =
+            paymentType === "EMI" ? nextPaymentDueDate : null;
+
+          // Upload new discount file if provided
+          if (discountFile) {
+            const params = {
+              Bucket: process.env.DO_SPACE_BUCKET,
+              Key: `discounts/${Date.now()}_${discountFile.originalname}`,
+              Body: discountFile.buffer,
+              ACL: "public-read",
+              ContentType: discountFile.mimetype,
+            };
+            const uploaded = await s3.upload(params).promise();
+            feeRecord.discountFile = uploaded.Location;
+          }
+
+          await feeRecord.save();
+        }
       } catch (err) {
         return res.status(400).json({
           success: false,
@@ -913,6 +975,7 @@ exports.updateStudent = async (req, res) => {
       .json({ success: false, message: "Internal server error" });
   }
 };
+
 
 exports.getStudents = async (req, res) => {
   try {
