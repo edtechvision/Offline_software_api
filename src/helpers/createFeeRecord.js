@@ -182,7 +182,6 @@ async function createFeeRecord(student, courseDetails, file,inchargeCode) {
     discountCode,
     discountFile: discountFileUrl,
     nextPaymentDueDate: paymentType === "EMI" ? nextPaymentDueDate : null,
-    inchargeCode,
     status:
       pendingAmount === 0 ? "Completed" : paidAmount > 0 ? "Partial" : "Pending",
     paymentHistory:
@@ -207,6 +206,8 @@ async function createFeeRecord(student, courseDetails, file,inchargeCode) {
                   : "Discount Applied",
               receiptNo: generateReceiptNo(),
               paymentDate: Date.now(),
+              collectedBy: "Incharge", 
+              inchargeCode,
             },
           ]
         : [],

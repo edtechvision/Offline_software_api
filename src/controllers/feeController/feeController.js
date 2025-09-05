@@ -174,11 +174,113 @@ function generateReceiptNo() {
 //   }
 // };
 
+// exports.addPayment = async (req, res) => {
+//   try {
+//     const {
+//       feeId,
+//       amount, // ✅ amount student actually paid (after discount)
+//       paymentMode,
+//       transactionId,
+//       remarks,
+//       paymentDate,
+//       discountCode,
+//       discountAmount = 0,
+//       fine = 0,
+//     } = req.body;
+
+//     const fee = await Fee.findById(feeId);
+//     if (!fee) {
+//       return res
+//         .status(404)
+//         .json({ success: false, message: "Fee record not found" });
+//     }
+
+//     // ✅ Force numeric values
+//     const prevPaid = Number(fee.paidAmount) || 0;
+//     const amt = Number(amount) || 0;
+//     const extraFine = Number(fine) || 0;
+//     const effectiveDiscount = Number(discountAmount) || 0;
+
+//     // ✅ Previous received amount before this payment
+//     const previousReceivedAmount = prevPaid;
+
+//     // ✅ Update payment totals
+//     const netAmount = amt + extraFine;
+
+//     // Paid amount = only what student actually paid (not discount)
+//     fee.paidAmount = prevPaid + netAmount;
+
+//     // Track total discounts on fee
+//     fee.totalDiscount = (Number(fee.totalDiscount) || 0) + effectiveDiscount;
+
+//     // Pending = totalFee - (paid + totalDiscount)
+//     fee.pendingAmount = Math.max(
+//       0,
+//       Number(fee.totalFee) - (fee.paidAmount + fee.totalDiscount)
+//     );
+
+//     // ✅ Handle optional discount file upload
+//     let discountFileUrl = null;
+//     if (req.file) {
+//       const params = {
+//         Bucket: process.env.DO_SPACE_BUCKET,
+//         Key: `discounts/${Date.now()}_${req.file.originalname}`,
+//         Body: req.file.buffer,
+//         ACL: "public-read",
+//         ContentType: req.file.mimetype,
+//       };
+
+//       const uploaded = await s3.upload(params).promise();
+//       discountFileUrl = uploaded.Location;
+//     }
+
+//     // ✅ Add payment history
+//     fee.paymentHistory.push({
+//       amount: amt,
+//       fine: extraFine,
+//       discountCode,
+//       discountAmount: effectiveDiscount,
+//       discountFile: discountFileUrl,
+//       previousReceivedAmount,
+//       pendingAmountAfterPayment: fee.pendingAmount,
+//       paymentMode,
+//       transactionId,
+//       remarks,
+//       paymentDate: paymentDate || Date.now(),
+//       receiptNo: generateReceiptNo(),
+//     });
+
+//     // ✅ Update status
+//     if (fee.pendingAmount === 0) {
+//       fee.status = "Completed";
+//     } else if (fee.paidAmount > 0) {
+//       fee.status = "Partial";
+//     } else {
+//       fee.status = "Pending";
+//     }
+
+//     const updatedFee = await fee.save();
+
+//     res.status(200).json({
+//       success: true,
+//       message: "Payment added successfully",
+//       data: updatedFee,
+//     });
+//   } catch (error) {
+//     console.error("Error adding payment:", error);
+//     res.status(500).json({
+//       success: false,
+//       message: "Internal server error",
+//     });
+//   }
+// };
+
+
 exports.addPayment = async (req, res) => {
   try {
     const {
       feeId,
-      amount, // ✅ amount student actually paid (after discount)
+      amount,
       paymentMode,
       transactionId,
       remarks,
@@ -186,40 +288,35 @@ exports.addPayment = async (req, res) => {
       discountCode,
       discountAmount = 0,
       fine = 0,
+      collectedBy, // ✅ "Admin" or "Incharge"
+      inchargeCode, // ✅ optional
     } = req.body;
 
     const fee = await Fee.findById(feeId);
     if (!fee) {
-      return res
-        .status(404)
-        .json({ success: false, message: "Fee record not found" });
+      return res.status(404).json({ success: false, message: "Fee record not found" });
     }
 
-    // ✅ Force numeric values
+    if (!["Admin", "Incharge"].includes(collectedBy)) {
+      return res.status(400).json({ success: false, message: "Invalid collectedBy value" });
+    }
+
+    if (collectedBy === "Incharge" && !inchargeCode) {
+      return res.status(400).json({ success: false, message: "Incharge code is required when collectedBy is Incharge" });
+    }
+
     const prevPaid = Number(fee.paidAmount) || 0;
     const amt = Number(amount) || 0;
     const extraFine = Number(fine) || 0;
     const effectiveDiscount = Number(discountAmount) || 0;
 
-    // ✅ Previous received amount before this payment
     const previousReceivedAmount = prevPaid;
-
-    // ✅ Update payment totals
     const netAmount = amt + extraFine;
 
-    // Paid amount = only what student actually paid (not discount)
     fee.paidAmount = prevPaid + netAmount;
-
-    // Track total discounts on fee
     fee.totalDiscount = (Number(fee.totalDiscount) || 0) + effectiveDiscount;
+    fee.pendingAmount = Math.max(0, Number(fee.totalFee) - (fee.paidAmount + fee.totalDiscount));
 
-    // Pending = totalFee - (paid + totalDiscount)
-    fee.pendingAmount = Math.max(
-      0,
-      Number(fee.totalFee) - (fee.paidAmount + fee.totalDiscount)
-    );
-
-    // ✅ Handle optional discount file upload
     let discountFileUrl = null;
     if (req.file) {
       const params = {
@@ -229,12 +326,10 @@ exports.addPayment = async (req, res) => {
         ACL: "public-read",
         ContentType: req.file.mimetype,
       };
-
       const uploaded = await s3.upload(params).promise();
       discountFileUrl = uploaded.Location;
     }
 
-    // ✅ Add payment history
     fee.paymentHistory.push({
       amount: amt,
       fine: extraFine,
@@ -248,17 +343,13 @@ exports.addPayment = async (req, res) => {
       remarks,
       paymentDate: paymentDate || Date.now(),
       receiptNo: generateReceiptNo(),
+
+      // ✅ new tracking fields
+      collectedBy,
+      inchargeCode: collectedBy === "Incharge" ? inchargeCode : null,
     });
 
-    // ✅ Update status
-    if (fee.pendingAmount === 0) {
-      fee.status = "Completed";
-    } else if (fee.paidAmount > 0) {
-      fee.status = "Partial";
-    } else {
-      fee.status = "Pending";
-    }
-
+    fee.status = fee.pendingAmount === 0 ? "Completed" : fee.paidAmount > 0 ? "Partial" : "Pending";
     const updatedFee = await fee.save();
 
     res.status(200).json({
@@ -268,10 +359,7 @@ exports.addPayment = async (req, res) => {
     });
   } catch (error) {
     console.error("Error adding payment:", error);
-    res.status(500).json({
-      success: false,
-      message: "Internal server error",
-    });
+    res.status(500).json({ success: false, message: "Internal server error" });
   }
 };
 
