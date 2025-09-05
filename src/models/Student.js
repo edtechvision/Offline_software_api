@@ -10,7 +10,7 @@ const addressSchema = new mongoose.Schema({
 
 const courseSchema = new mongoose.Schema({
       courseId: { type: mongoose.Schema.Types.ObjectId, ref: "Course" },
-    additionalCourseId: { type: mongoose.Schema.Types.ObjectId, ref: "AdditionalCourse" },
+    additionalCourseId: { type: mongoose.Schema.Types.ObjectId, ref: "AdditionalCourse" ,required: false},
   paymentType: { type: String, required: true,enum: ['Full-payment', 'EMI'] },
   downPayment:{ type: Number, required: false },
   nextPaymentDueDate:{ type: Date, required: false },
@@ -48,7 +48,7 @@ const studentSchema = new mongoose.Schema({
   email: { type: String },
   mobileNumber: { type: String, required: true },
   alternativeMobileNumber: { type: String },
-  adharNumber: { type: String, required: true, unique: true },
+  adharNumber: { type: String, required: false, unique: true },
   presentAddress: { type: addressSchema, required: true },
   permanentAddress: { type: addressSchema, required: true },
   isPermanentSameAsPresent: { type: Boolean, default: false },
