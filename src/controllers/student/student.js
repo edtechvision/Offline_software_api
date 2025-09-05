@@ -390,7 +390,6 @@ exports.createStudent = async (req, res) => {
       });
     }
 
-    // attach centerId
     studentData.centerId = center._id;
 
     // ✅ Generate registration number
@@ -399,7 +398,7 @@ exports.createStudent = async (req, res) => {
       studentData.className
     );
 
-    // ✅ Required fields validation
+    // ✅ Validate required fields
     const requiredFields = [
       "centerCode",
       "inchargeCode",
@@ -423,7 +422,7 @@ exports.createStudent = async (req, res) => {
       });
     }
 
-    // ✅ Validate email if provided
+    // ✅ Validate email
     if (studentData.email) {
       const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
       if (!emailRegex.test(studentData.email)) {
@@ -433,23 +432,14 @@ exports.createStudent = async (req, res) => {
       }
     }
 
-    // ✅ Parse JSON fields safely
+    // ✅ Parse JSON safely
     try {
-      studentData.presentAddress = parseJsonField(
-        studentData.presentAddress,
-        "presentAddress"
-      );
-      studentData.permanentAddress = parseJsonField(
-        studentData.permanentAddress,
-        "permanentAddress"
-      );
-      if (studentData.courseDetails) {
-        studentData.courseDetails = parseJsonField(
-          studentData.courseDetails,
-          "courseDetails"
-        );
+      studentData.presentAddress = parseJsonField(studentData.presentAddress, "presentAddress");
+      studentData.permanentAddress = parseJsonField(studentData.permanentAddress, "permanentAddress");
 
-        // Normalize empty strings → null
+      if (studentData.courseDetails) {
+        studentData.courseDetails = parseJsonField(studentData.courseDetails, "courseDetails");
+
         Object.keys(studentData.courseDetails).forEach((key) => {
           if (studentData.courseDetails[key] === "") {
             studentData.courseDetails[key] = null;
@@ -465,36 +455,39 @@ exports.createStudent = async (req, res) => {
       studentData.permanentAddress = { ...studentData.presentAddress };
     }
 
-    // ✅ Upload image if provided
-    if (req.file) {
+    // ✅ Upload profile image
+    if (req.files?.image) {
       try {
-        const { image } = await uploadImage(req.file);
+        const { image } = await uploadImage(req.files.image[0]); // custom uploader
         studentData.image = image;
       } catch {
-        return res
-          .status(500)
-          .json({ success: false, message: "Failed to upload image" });
+        return res.status(500).json({
+          success: false,
+          message: "Failed to upload image",
+        });
       }
     }
 
-    // ✅ Generate QR code
+    // ✅ Generate QR Code
     try {
       studentData.qrCode = await generateQRCode(studentData.registrationNo);
       studentData.qrCodeData = studentData.registrationNo;
     } catch {
-      return res
-        .status(500)
-        .json({ success: false, message: "Failed to generate QR Code" });
+      return res.status(500).json({
+        success: false,
+        message: "Failed to generate QR Code",
+      });
     }
 
     // ✅ Save student
     const student = new Student(studentData);
     const savedStudent = await student.save();
 
-    // ✅ Handle fee creation (course is required)
+    // ✅ Handle fee creation
     if (studentData.courseDetails) {
       try {
-        await createFeeRecord(savedStudent, studentData.courseDetails);
+        const discountFile = req.files?.discountFile ? req.files.discountFile[0] : null;
+        await createFeeRecord(savedStudent, studentData.courseDetails, discountFile);
       } catch (err) {
         return res.status(400).json({
           success: false,
@@ -508,7 +501,6 @@ exports.createStudent = async (req, res) => {
       });
     }
 
-    // ✅ Final success response
     res.status(201).json({
       success: true,
       message: "Student created successfully",
@@ -529,11 +521,10 @@ exports.createStudent = async (req, res) => {
         errors,
       });
     }
-    res
-      .status(500)
-      .json({ success: false, message: "Internal server error" });
+    res.status(500).json({ success: false, message: "Internal server error" });
   }
 };
+
 
 
 // exports.updateStudent = async (req, res) => {
@@ -863,8 +854,11 @@ exports.updateStudent = async (req, res) => {
     ) {
       try {
         await Fee.deleteMany({ studentId: existingStudent._id });
+           const discountFile = req.files?.discountFile
+      ? req.files.discountFile[0]
+      : null;
         // Reuse helper for fee record creation
-        await createFeeRecord(existingStudent, updateData.courseDetails);
+    await createFeeRecord(existingStudent, updateData.courseDetails, discountFile);
       } catch (err) {
         return res.status(400).json({
           success: false,

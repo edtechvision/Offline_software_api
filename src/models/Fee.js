@@ -29,6 +29,10 @@ const feeSchema = new mongoose.Schema(
       type: Number,
       default: 0,
     },
+     totalDiscount: {
+      type: Number,
+      default: 0,
+    },
     pendingAmount: {
       type: Number,
       default: function () {
