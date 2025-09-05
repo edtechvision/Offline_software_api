@@ -48,7 +48,7 @@ const feeSchema = new mongoose.Schema(
     discountFile: { type: String }, // ✅ URL of uploaded file
         collectedBy: { type: String,  required: true },
 
-      inchargeCode: { type: String, required: true },
+      inchargeCode: { type: String, required: false },
 
 
         previousReceivedAmount: { type: Number, default: 0 }, // ✅ new field
