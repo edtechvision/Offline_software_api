@@ -46,7 +46,7 @@ const feeSchema = new mongoose.Schema(
         discountCode: { type: String }, // ✅ Discount code
         discountAmount: { type: Number, default: 0 }, // ✅ Discount amount
     discountFile: { type: String }, // ✅ URL of uploaded file
-        collectedBy: { type: String, enum: ["Admin", "Incharge"], required: true },
+        collectedBy: { type: String,  required: true },
 
       inchargeCode: { type: String, required: true },
 
