@@ -862,6 +862,7 @@ exports.updateStudent = async (req, res) => {
         existingStudent.courseDetails?.courseId?.toString()
     ) {
       try {
+        await Fee.deleteMany({ studentId: existingStudent._id });
         // Reuse helper for fee record creation
         await createFeeRecord(existingStudent, updateData.courseDetails);
       } catch (err) {
