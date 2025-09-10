@@ -12,6 +12,7 @@ const additionalCourseRoute = require("../routes/additionalCourse/additionalCour
 const feesDiscountRoute = require("../routes/feesDiscount/feesDiscountRoutes");
 const feesRoute = require("../routes/feeRoutes/feeRoutes");
 const dashboardRoute = require("../routes/dashboard/dashboard.routes");
+const expenseRoute = require("../routes/expenseRoutes/expenseRoutes");
 
 const router = express.Router();
 
@@ -26,5 +27,6 @@ router.use("/api/v1", additionalCourseRoute);
 router.use("/api/v1", feesDiscountRoute);
 router.use("/api/v1", feesRoute);
 router.use("/api/v1", dashboardRoute);
+router.use("/api/v1", expenseRoute);
 
 module.exports = router;
