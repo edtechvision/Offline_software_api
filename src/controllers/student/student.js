@@ -1,11 +1,10 @@
-const AWS = require('aws-sdk');
+const AWS = require("aws-sdk");
 
-
-const Student = require('../../models/Student');
+const Student = require("../../models/Student");
 const QRCode = require("qrcode");
 const s3 = require("../../utils/s3");
 const { v4: uuidv4 } = require("uuid");
-const Fee = require('../../models/Fee');
+const Fee = require("../../models/Fee");
 
 const {
   parseJsonField,
@@ -14,14 +13,14 @@ const {
   deleteImage,
   generateQRCode,
 } = require("./studentUtils");
-const Center = require('../../models/Center');
-const createFeeRecord = require('../../helpers/createFeeRecord');
+const Center = require("../../models/Center");
+const createFeeRecord = require("../../helpers/createFeeRecord");
+const { createLog } = require("../../helpers/logger");
 
 function generateReceiptNo() {
   const randomNum = Math.floor(10000 + Math.random() * 90000); // 5-digit random number
   return `TBREC${randomNum}`;
 }
-
 
 // exports.createStudent = async (req, res) => {
 //   try {
@@ -176,7 +175,6 @@ function generateReceiptNo() {
 //   await fee.save();
 // }
 
-
 //     res.status(201).json({ success: true, message: "Student created", data: savedStudent });
 //   } catch (error) {
 //     if (error.code === 11000) {
@@ -189,9 +187,6 @@ function generateReceiptNo() {
 //     res.status(500).json({ success: false, message: "Internal server error" });
 //   }
 // };
-
-
-
 
 // ✅ UPDATE STUDENT
 // exports.updateStudent = async (req, res) => {
@@ -434,11 +429,20 @@ exports.createStudent = async (req, res) => {
 
     // ✅ Parse JSON safely
     try {
-      studentData.presentAddress = parseJsonField(studentData.presentAddress, "presentAddress");
-      studentData.permanentAddress = parseJsonField(studentData.permanentAddress, "permanentAddress");
+      studentData.presentAddress = parseJsonField(
+        studentData.presentAddress,
+        "presentAddress"
+      );
+      studentData.permanentAddress = parseJsonField(
+        studentData.permanentAddress,
+        "permanentAddress"
+      );
 
       if (studentData.courseDetails) {
-        studentData.courseDetails = parseJsonField(studentData.courseDetails, "courseDetails");
+        studentData.courseDetails = parseJsonField(
+          studentData.courseDetails,
+          "courseDetails"
+        );
 
         Object.keys(studentData.courseDetails).forEach((key) => {
           if (studentData.courseDetails[key] === "") {
@@ -483,11 +487,30 @@ exports.createStudent = async (req, res) => {
     const student = new Student(studentData);
     const savedStudent = await student.save();
 
+    // After saving student
+    await createLog({
+      action: "CREATE_STUDENT",
+      user: "Incharge", // or req.user if you have authentication
+      inchargeCode: studentData.inchargeCode,
+      details: {
+        studentId: savedStudent._id,
+        registrationNo: savedStudent.registrationNo,
+        centerCode: savedStudent.centerCode,
+      },
+    });
+
     // ✅ Handle fee creation
     if (studentData.courseDetails) {
       try {
-        const discountFile = req.files?.discountFile ? req.files.discountFile[0] : null;
-        await createFeeRecord(savedStudent, studentData.courseDetails, discountFile, studentData.inchargeCode );
+        const discountFile = req.files?.discountFile
+          ? req.files.discountFile[0]
+          : null;
+        await createFeeRecord(
+          savedStudent,
+          studentData.courseDetails,
+          discountFile,
+          studentData.inchargeCode
+        );
       } catch (err) {
         return res.status(400).json({
           success: false,
@@ -524,8 +547,6 @@ exports.createStudent = async (req, res) => {
     res.status(500).json({ success: false, message: "Internal server error" });
   }
 };
-
-
 
 // exports.updateStudent = async (req, res) => {
 //   try {
@@ -755,7 +776,6 @@ exports.createStudent = async (req, res) => {
 //   }
 // };
 
-
 exports.updateStudent = async (req, res) => {
   try {
     const { id } = req.params;
@@ -957,26 +977,21 @@ exports.updateStudent = async (req, res) => {
         errors,
       });
     }
-    res
-      .status(500)
-      .json({ success: false, message: "Internal server error" });
+    res.status(500).json({ success: false, message: "Internal server error" });
   }
 };
-
-
-
 
 exports.getStudents = async (req, res) => {
   try {
     const {
       page = 1,
       limit = 10,
-      search = '',
-      sortBy = 'createdAt',
-      sortOrder = 'desc',
-      batchId,         // ✅ new filter
-      courseId,         // ✅ new filter
-      className        // ✅ new filter
+      search = "",
+      sortBy = "createdAt",
+      sortOrder = "desc",
+      batchId, // ✅ new filter
+      courseId, // ✅ new filter
+      className, // ✅ new filter
     } = req.query;
 
     // Parse pagination parameters
@@ -986,10 +1001,10 @@ exports.getStudents = async (req, res) => {
 
     // Build search + filter query
     const searchQuery = {};
-    
+
     // Apply search
     if (search) {
-      const searchRegex = new RegExp(search, 'i');
+      const searchRegex = new RegExp(search, "i");
       searchQuery.$or = [
         { studentName: searchRegex },
         { fathersName: searchRegex },
@@ -1001,8 +1016,8 @@ exports.getStudents = async (req, res) => {
         { inchargeCode: searchRegex },
         { collegeName: searchRegex },
         { className: searchRegex },
-        { 'presentAddress.city': searchRegex },
-        { 'presentAddress.state': searchRegex }
+        { "presentAddress.city": searchRegex },
+        { "presentAddress.state": searchRegex },
       ];
     }
 
@@ -1021,14 +1036,14 @@ exports.getStudents = async (req, res) => {
 
     // Build sort object
     const sortOptions = {};
-    sortOptions[sortBy] = sortOrder === 'desc' ? -1 : 1;
+    sortOptions[sortBy] = sortOrder === "desc" ? -1 : 1;
 
     // Execute query with pagination
     const students = await Student.find(searchQuery)
       .sort(sortOptions)
       .skip(skip)
       .limit(limitNum)
-      .select('-__v')
+      .select("-__v")
       .populate("courseDetails.courseId", "name fee")
       .populate("courseDetails.additionalCourseId", "name")
       .populate("courseDetails.batchId", "batchName")
@@ -1039,7 +1054,7 @@ exports.getStudents = async (req, res) => {
 
     res.status(200).json({
       success: true,
-      message: 'Students retrieved successfully',
+      message: "Students retrieved successfully",
       data: {
         students,
         pagination: {
@@ -1048,20 +1063,18 @@ exports.getStudents = async (req, res) => {
           totalStudents,
           hasNext: pageNum < totalPages,
           hasPrev: pageNum > 1,
-          limit: limitNum
-        }
-      }
+          limit: limitNum,
+        },
+      },
     });
-
   } catch (error) {
-    console.error('Error fetching students:', error);
+    console.error("Error fetching students:", error);
     res.status(500).json({
       success: false,
-      message: 'Internal server error'
+      message: "Internal server error",
     });
   }
 };
-
 
 exports.getStudentById = async (req, res) => {
   try {
@@ -1069,7 +1082,7 @@ exports.getStudentById = async (req, res) => {
 
     // Find student by ID and populate related fields
     const student = await Student.findById(id)
-      .select('-__v')
+      .select("-__v")
       .populate("courseDetails.courseId", "name fee")
       .populate("courseDetails.additionalCourseId", "name")
       .populate("courseDetails.batchId", "batchName");
@@ -1077,27 +1090,23 @@ exports.getStudentById = async (req, res) => {
     if (!student) {
       return res.status(404).json({
         success: false,
-        message: 'Student not found'
+        message: "Student not found",
       });
     }
 
     res.status(200).json({
       success: true,
-      message: 'Student retrieved successfully',
-      data: student
+      message: "Student retrieved successfully",
+      data: student,
     });
-
   } catch (error) {
-    console.error('Error fetching student by ID:', error);
+    console.error("Error fetching student by ID:", error);
     res.status(500).json({
       success: false,
-      message: 'Internal server error'
+      message: "Internal server error",
     });
   }
 };
-
-
-
 
 // ✅ Activate student
 exports.activateStudent = async (req, res) => {
@@ -1110,7 +1119,9 @@ exports.activateStudent = async (req, res) => {
     );
 
     if (!student) return res.status(404).json({ message: "Student not found" });
-    res.status(200).json({ message: "Student activated successfully", student });
+    res
+      .status(200)
+      .json({ message: "Student activated successfully", student });
   } catch (err) {
     res.status(500).json({ message: err.message });
   }
@@ -1127,7 +1138,9 @@ exports.deactivateStudent = async (req, res) => {
     );
 
     if (!student) return res.status(404).json({ message: "Student not found" });
-    res.status(200).json({ message: "Student deactivated successfully", student });
+    res
+      .status(200)
+      .json({ message: "Student deactivated successfully", student });
   } catch (err) {
     res.status(500).json({ message: err.message });
   }

@@ -17,8 +17,8 @@ router.get("/expenses/:id", expenseController.getExpenseById);
 
 router.delete("/expenses/:id", expenseController.deleteExpense);
 // // Update status (paid/unpaid)
-router.put("/:id/status", expenseController.updateExpenseStatus);
+router.put("/expenses/:id/status", expenseController.updateExpenseStatus);
 // // Toggle approval (true <-> false)
-router.put("/:id/toggle-approval", expenseController.toggleApproval);
+router.put("/expenses/:id/toggle-approval", expenseController.toggleApproval);
 
 module.exports = router;

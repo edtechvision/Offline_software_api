@@ -9,97 +9,42 @@ app.use(cors());
 // Increase JSON body size limit
 app.use(express.json({ limit: "50mb" }));
 app.use(express.urlencoded({ limit: "50mb", extended: true }));
-app.use('/uploads', express.static('uploads'));
+app.use("/uploads", express.static("uploads"));
 const Student = require("./models/Student");
-
-async function addIsActiveFieldToExistingStudents() {
-  try {
-    const result = await Student.updateMany(
-      { isActive: { $exists: false } },
-      { $set: { isActive: false } }
-    );
-    console.log(`Updated ${result.modifiedCount} students with isActive field.`);
-  } catch (error) {
-    console.error('Error updating students:', error);
-  }
-}
-
-// addIsActiveFieldToExistingStudents()
-
-// addIsActiveField();
+const { createLog } = require("./helpers/logger");
 const Fee = require("./models/Fee");
 
-
-
-async function fixFeeRecords() {
-
-  const fees = await Fee.find({});
-  for (const fee of fees) {
-    // ✅ Recalculate paidAmount from payment history
-    const totalPaid = fee.paymentHistory.reduce(
-      (sum, p) => sum + Number(p.amount || 0) + Number(p.fine || 0),
-      0
-    );
-
-    fee.paidAmount = totalPaid;
-    fee.pendingAmount = Math.max(0, fee.totalFee - totalPaid);
-
-    // ✅ Fix status
-    if (fee.pendingAmount === 0) {
-      fee.status = "Completed";
-    } else if (fee.paidAmount > 0) {
-      fee.status = "Partial";
-    } else {
-      fee.status = "Pending";
-    }
-
-    await fee.save();
-    console.log(`Fixed Fee ID: ${fee._id}, Paid: ${fee.paidAmount}, Pending: ${fee.pendingAmount}`);
-  }
-
-  
-}
-
-// fixFeeRecords().catch(err => {
-//   console.error("Migration failed:", err);
-// });
-
-
-
-
-async function updateOldPayments() {
+async function backfillFeeLogs() {
   try {
-    const fees = await Fee.find({ "paymentHistory.0": { $exists: true } }); // only fees with payment history
+    const fees = await Fee.find({});
+    console.log(`Found ${fees.length} fee records.`);
 
-    for (let fee of fees) {
-      let updated = false;
-
-      fee.paymentHistory = fee.paymentHistory.map((entry) => {
-        // Only update if missing collectedBy or inchargeCode
-        if (!entry.collectedBy || !entry.inchargeCode) {
-          updated = true;
-          return {
-            ...entry.toObject?.() || entry,
-            collectedBy: "Incharge",
-            inchargeCode: "TBINC20538",
-          };
-        }
-        return entry;
+    for (const fee of fees) {
+      await createLog({
+        action: "FEE_CREATED",
+        user: "Incharge", // distinguish old logs
+        inchargeCode: fee.paymentHistory?.[0]?.inchargeCode || "Unknown",
+        details: {
+          studentId: fee.studentId,
+          courseId: fee.courseId,
+          batchId: fee.batchId,
+          paidAmount: fee.paidAmount,
+          pendingAmount: fee.pendingAmount,
+          discountApplied: fee.totalDiscount,
+          status: fee.status,
+        },
       });
-
-      if (updated) {
-        await fee.save();
-        console.log(`✅ Updated Fee: ${fee._id}`);
-      }
+      console.log(`Log created for fee record: ${fee._id}`);
     }
 
-    console.log("🎉 Migration complete!");
-  } catch (error) {
-    console.error("❌ Error updating payment history:", error);
+    console.log("🎉 Fee logs backfill complete!");
+    return { success: true, message: "Logs created for existing fees" };
+  } catch (err) {
+    console.error("❌ Error in backfillFeeLogs:", err);
+    return { success: false, message: err.message };
   }
 }
-// updateOldPayments()
-
+// backfillFeeLogs();
 const routes = require("./routes/index");
 
 app.use(routes);

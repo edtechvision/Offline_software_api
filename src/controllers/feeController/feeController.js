@@ -1,4 +1,5 @@
 // controllers/feeController.js
+const { createLog } = require("../../helpers/logger");
 const AdmissionIncharge = require("../../models/AdmissionIncharge");
 const Fee = require("../../models/Fee");
 const Student = require("../../models/Student");
@@ -7,11 +8,20 @@ const s3 = require("../../utils/s3");
 // ✅ Create Fee Record for a Student
 exports.createFee = async (req, res) => {
   try {
-    const { studentId, totalFee, paidAmount, paymentMode, transactionId, remarks } = req.body;
+    const {
+      studentId,
+      totalFee,
+      paidAmount,
+      paymentMode,
+      transactionId,
+      remarks,
+    } = req.body;
 
     const student = await Student.findById(studentId);
     if (!student) {
-      return res.status(404).json({ success: false, message: "Student not found" });
+      return res
+        .status(404)
+        .json({ success: false, message: "Student not found" });
     }
 
     const pendingAmount = totalFee - (paidAmount || 0);
@@ -33,7 +43,12 @@ exports.createFee = async (req, res) => {
             },
           ]
         : [],
-      status: pendingAmount === 0 ? "Completed" : paidAmount > 0 ? "Partial" : "Pending",
+      status:
+        pendingAmount === 0
+          ? "Completed"
+          : paidAmount > 0
+          ? "Partial"
+          : "Pending",
     });
 
     const savedFee = await fee.save();
@@ -59,7 +74,6 @@ function generateReceiptNo() {
   return `TBREC${randomNum}`;
 }
 
-
 // ✅ Get Fees by Student
 // exports.getStudentFees = async (req, res) => {
 //   try {
@@ -83,7 +97,6 @@ function generateReceiptNo() {
 //     });
 //   }
 // };
-
 
 // exports.addPayment = async (req, res) => {
 //   try {
@@ -276,7 +289,6 @@ function generateReceiptNo() {
 //   }
 // };
 
-
 // exports.addPayment = async (req, res) => {
 //   try {
 //     const {
@@ -351,7 +363,6 @@ function generateReceiptNo() {
 //       inchargeCode: collectedBy === "Incharge" ? inchargeCode : null,
 //     });
 
-    
 //     // ✅ Update nextPaymentDueDate if provided
 //     if (nextPaymentDueDate) {
 //       fee.nextPaymentDueDate = nextPaymentDueDate;
@@ -369,7 +380,6 @@ function generateReceiptNo() {
 //     res.status(500).json({ success: false, message: "Internal server error" });
 //   }
 // };
-
 
 exports.addPayment = async (req, res) => {
   try {
@@ -390,7 +400,9 @@ exports.addPayment = async (req, res) => {
 
     const fee = await Fee.findById(feeId);
     if (!fee) {
-      return res.status(404).json({ success: false, message: "Fee record not found" });
+      return res
+        .status(404)
+        .json({ success: false, message: "Fee record not found" });
     }
 
     let collectedByName = null;
@@ -483,6 +495,30 @@ exports.addPayment = async (req, res) => {
 
     const updatedFee = await fee.save();
 
+    // ✅ Async-safe Log
+    createLog({
+      action: "PAYMENT_ADDED",
+      user: collectedByName, // Admin or Incharge Name
+      inchargeCode: inchargeCodeValue,
+      details: {
+        feeId: fee._id,
+        studentId: fee.studentId,
+        courseId: fee.courseId,
+        batchId: fee.batchId,
+        paidAmount: amt,
+        fine: extraFine,
+        discountApplied: effectiveDiscount,
+        pendingAmount: fee.pendingAmount,
+        status: updatedFee.status,
+        remarks,
+        paymentMode,
+        transactionId,
+        receiptNo: fee.paymentHistory[fee.paymentHistory.length - 1].receiptNo,
+      },
+    }).catch((err) => {
+      console.error("Log creation failed:", err.message);
+    });
+
     res.status(200).json({
       success: true,
       message: "Payment added successfully",
@@ -494,13 +530,15 @@ exports.addPayment = async (req, res) => {
   }
 };
 
-
 exports.getStudentFees = async (req, res) => {
   try {
     const { studentId } = req.params;
 
     const fees = await Fee.find({ studentId })
-      .populate("studentId", "-__v -qrCode -presentAddress -permanentAddress -courseDetails") // ✅ exclude qrCode
+      .populate(
+        "studentId",
+        "-__v -qrCode -presentAddress -permanentAddress -courseDetails"
+      ) // ✅ exclude qrCode
       .populate("courseId", "name fee") // keep course limited
       .populate("batchId", "batchName"); // keep batch limited
 
@@ -541,16 +579,18 @@ exports.getStudentFees = async (req, res) => {
   }
 };
 
-
-
-
 exports.getPayments = async (req, res) => {
   try {
     const { feeId } = req.params;
 
-    const fee = await Fee.findById(feeId).populate("studentId", "studentName registrationNo"); // optional populate
+    const fee = await Fee.findById(feeId).populate(
+      "studentId",
+      "studentName registrationNo"
+    ); // optional populate
     if (!fee) {
-      return res.status(404).json({ success: false, message: "Fee record not found" });
+      return res
+        .status(404)
+        .json({ success: false, message: "Fee record not found" });
     }
 
     res.status(200).json({
@@ -619,8 +659,6 @@ exports.getPayments = async (req, res) => {
 //   }
 // };
 
-
-
 // exports.revertPayment = async (req, res) => {
 //   try {
 //     const { feeId, receiptNo } = req.body;
@@ -683,7 +721,14 @@ exports.getPayments = async (req, res) => {
 // };
 exports.getAllPayments = async (req, res) => {
   try {
-    let { page = 1, limit = 10, paymentMode, search, startDate, endDate } = req.query;
+    let {
+      page = 1,
+      limit = 10,
+      paymentMode,
+      search,
+      startDate,
+      endDate,
+    } = req.query;
 
     page = parseInt(page) || 1;
     limit = parseInt(limit) || 10;
@@ -697,8 +742,10 @@ exports.getAllPayments = async (req, res) => {
 
     if (startDate || endDate) {
       matchStage["paymentHistory.paymentDate"] = {};
-      if (startDate) matchStage["paymentHistory.paymentDate"]["$gte"] = new Date(startDate);
-      if (endDate) matchStage["paymentHistory.paymentDate"]["$lte"] = new Date(endDate);
+      if (startDate)
+        matchStage["paymentHistory.paymentDate"]["$gte"] = new Date(startDate);
+      if (endDate)
+        matchStage["paymentHistory.paymentDate"]["$lte"] = new Date(endDate);
     }
 
     // ✅ Fetch fees with populated data
@@ -708,7 +755,9 @@ exports.getAllPayments = async (req, res) => {
       .populate("batchId", "batchName");
 
     if (!fees || fees.length === 0) {
-      return res.status(404).json({ success: false, message: "No payments found" });
+      return res
+        .status(404)
+        .json({ success: false, message: "No payments found" });
     }
 
     // ✅ Flatten payment history
@@ -765,7 +814,6 @@ exports.getAllPayments = async (req, res) => {
     });
   }
 };
-
 
 exports.revertPayment = async (req, res) => {
   try {
@@ -844,6 +892,27 @@ exports.revertPayment = async (req, res) => {
 
     const updatedFee = await fee.save();
 
+    // ✅ Async-safe Log
+    createLog({
+      action: "PAYMENT_REVERTED",
+      user: paymentToDelete.collectedBy, // Admin / Incharge
+      inchargeCode: paymentToDelete.inchargeCode || null,
+      details: {
+        feeId: fee._id,
+        studentId: fee.studentId,
+        courseId: fee.courseId,
+        batchId: fee.batchId,
+        revertedReceiptNo: receiptNo,
+        revertedAmount: amount,
+        revertedFine: fine,
+        revertedDiscount: discountAmount,
+        pendingAmount: fee.pendingAmount,
+        status: updatedFee.status,
+      },
+    }).catch((err) => {
+      console.error("Log creation failed:", err.message);
+    });
+
     res.status(200).json({
       success: true,
       message: "Payment reverted (deleted) successfully",
@@ -858,9 +927,6 @@ exports.revertPayment = async (req, res) => {
   }
 };
 
-
-
-
 exports.getPendingFees = async (req, res) => {
   try {
     const fees = await Fee.find({ pendingAmount: { $gt: 0 } }) // only students with pending fees
@@ -868,7 +934,9 @@ exports.getPendingFees = async (req, res) => {
       .populate("courseId", "name");
 
     if (!fees || fees.length === 0) {
-      return res.status(404).json({ success: false, message: "No pending fees found" });
+      return res
+        .status(404)
+        .json({ success: false, message: "No pending fees found" });
     }
 
     const pendingFeesList = fees.map((fee) => ({
@@ -899,18 +967,17 @@ exports.getPendingFees = async (req, res) => {
   }
 };
 
-
 exports.getCollectFeesStudents = async (req, res) => {
   try {
     const {
       page = 1,
       limit = 10,
-      search = '',
-      sortBy = 'createdAt',
-      sortOrder = 'desc',
+      search = "",
+      sortBy = "createdAt",
+      sortOrder = "desc",
       batchId,
       courseId,
-      className
+      className,
     } = req.query;
 
     const pageNum = parseInt(page);
@@ -921,7 +988,7 @@ exports.getCollectFeesStudents = async (req, res) => {
     const searchQuery = {};
 
     if (search) {
-      const searchRegex = new RegExp(search, 'i');
+      const searchRegex = new RegExp(search, "i");
       searchQuery.$or = [
         { studentName: searchRegex },
         { fathersName: searchRegex },
@@ -933,8 +1000,8 @@ exports.getCollectFeesStudents = async (req, res) => {
         { inchargeCode: searchRegex },
         { collegeName: searchRegex },
         { className: searchRegex },
-        { 'presentAddress.city': searchRegex },
-        { 'presentAddress.state': searchRegex }
+        { "presentAddress.city": searchRegex },
+        { "presentAddress.state": searchRegex },
       ];
     }
 
@@ -950,32 +1017,33 @@ exports.getCollectFeesStudents = async (req, res) => {
 
     // Sort
     const sortOptions = {};
-    sortOptions[sortBy] = sortOrder === 'desc' ? -1 : 1;
+    sortOptions[sortBy] = sortOrder === "desc" ? -1 : 1;
 
     // ✅ Fetch students with filters + populate course/batch
     const students = await Student.find(searchQuery)
       .sort(sortOptions)
       .skip(skip)
       .limit(limitNum)
-      .select('studentName fathersName mobileNumber className courseDetails')
+      .select("studentName fathersName mobileNumber className courseDetails")
       .populate("courseDetails.courseId", "name")
       .populate("courseDetails.batchId", "batchName");
 
     // ✅ Fetch fee data for these students
-    const studentIds = students.map(s => s._id);
-    const fees = await Fee.find({ studentId: { $in: studentIds } })
-      .select('studentId totalFee paidAmount pendingAmount');
+    const studentIds = students.map((s) => s._id);
+    const fees = await Fee.find({ studentId: { $in: studentIds } }).select(
+      "studentId totalFee paidAmount pendingAmount"
+    );
 
     const feeMap = {};
-    fees.forEach(fee => {
+    fees.forEach((fee) => {
       feeMap[fee.studentId.toString()] = fee;
     });
 
     // ✅ Transform final response
-    const result = students.map(s => {
+    const result = students.map((s) => {
       const fee = feeMap[s._id.toString()] || {};
       return {
-            studentId: s._id,  // <-- add studentId here
+        studentId: s._id, // <-- add studentId here
 
         studentName: s.studentName,
         fathersName: s.fathersName,
@@ -985,7 +1053,7 @@ exports.getCollectFeesStudents = async (req, res) => {
         batch: s.courseDetails?.batchId?.batchName || "-",
         totalFee: fee.totalFee || 0,
         paidAmount: fee.paidAmount || 0,
-        pendingAmount: fee.pendingAmount || 0
+        pendingAmount: fee.pendingAmount || 0,
       };
     });
 
@@ -994,7 +1062,7 @@ exports.getCollectFeesStudents = async (req, res) => {
 
     res.status(200).json({
       success: true,
-      message: 'Students fee collection data retrieved successfully',
+      message: "Students fee collection data retrieved successfully",
       data: {
         students: result,
         pagination: {
@@ -1003,15 +1071,15 @@ exports.getCollectFeesStudents = async (req, res) => {
           totalStudents,
           hasNext: pageNum < totalPages,
           hasPrev: pageNum > 1,
-          limit: limitNum
-        }
-      }
+          limit: limitNum,
+        },
+      },
     });
   } catch (error) {
-    console.error('Error fetching students fee collection:', error);
+    console.error("Error fetching students fee collection:", error);
     res.status(500).json({
       success: false,
-      message: 'Internal server error'
+      message: "Internal server error",
     });
   }
 };
