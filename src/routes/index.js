@@ -14,6 +14,7 @@ const feesRoute = require("../routes/feeRoutes/feeRoutes");
 const dashboardRoute = require("../routes/dashboard/dashboard.routes");
 const expenseRoute = require("../routes/expenseRoutes/expenseRoutes");
 const logsRoute = require("../routes/logs/logs.routes");
+const inquiryRoute = require("../routes/inquiryRoutes/inquiryRoutes");
 
 const router = express.Router();
 
@@ -30,5 +31,6 @@ router.use("/api/v1", feesRoute);
 router.use("/api/v1", dashboardRoute);
 router.use("/api/v1", expenseRoute);
 router.use("/api/v1", logsRoute);
+router.use("/api/v1", inquiryRoute);
 
 module.exports = router;
