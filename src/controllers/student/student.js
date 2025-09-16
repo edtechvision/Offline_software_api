@@ -1145,3 +1145,60 @@ exports.deactivateStudent = async (req, res) => {
     res.status(500).json({ message: err.message });
   }
 };
+
+exports.deleteStudent = async (req, res) => {
+  try {
+    const studentId = req.params.id;
+
+    // ✅ Check if student exists
+    const student = await Student.findById(studentId);
+    if (!student) {
+      return res.status(404).json({
+        success: false,
+        message: "Student not found",
+      });
+    }
+
+    // ✅ Delete related fee record(s) if any
+    try {
+      await Fee.deleteMany({ studentId: student._id });
+    } catch (err) {
+      console.error("Failed to delete fee records:", err);
+      // Not critical enough to block student deletion, so continue
+    }
+
+    // ✅ Delete uploaded image if exists
+    if (student.image) {
+      try {
+        await deleteImage(student.image); // your custom delete helper
+      } catch (err) {
+        console.warn("Failed to delete image:", err.message);
+      }
+    }
+
+    // ✅ Delete the student
+    await Student.findByIdAndDelete(studentId);
+
+    // ✅ Create a delete log
+    await createLog({
+      action: "DELETE_STUDENT",
+      user: "Incharge", // or req.user if using auth
+      inchargeCode: student.inchargeCode,
+      details: {
+        studentId: student._id,
+        registrationNo: student.registrationNo,
+        centerCode: student.centerCode,
+      },
+    });
+
+    return res.status(200).json({
+      success: true,
+      message: "Student deleted successfully",
+    });
+  } catch (error) {
+    console.error(error);
+    return res
+      .status(500)
+      .json({ success: false, message: "Internal server error" });
+  }
+};

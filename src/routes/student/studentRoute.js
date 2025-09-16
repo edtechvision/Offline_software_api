@@ -1,7 +1,7 @@
 // routes/courseRoutes.js
-const express = require('express');
+const express = require("express");
 const router = express.Router();
-const ctrl = require('../../controllers/student/student');
+const ctrl = require("../../controllers/student/student");
 const multer = require("multer");
 
 // Configure multer for file uploads
@@ -11,8 +11,8 @@ const upload = multer({ storage: multer.memoryStorage() });
 router.post(
   "/student",
   upload.fields([
-    { name: "image", maxCount: 1 },         // student profile photo
-    { name: "discountFile", maxCount: 1 },  // fee-related discount document
+    { name: "image", maxCount: 1 }, // student profile photo
+    { name: "discountFile", maxCount: 1 }, // fee-related discount document
   ]),
   ctrl.createStudent
 );
@@ -26,11 +26,10 @@ router.put(
   ctrl.updateStudent
 );
 
-router.get('/students', ctrl.getStudents);
-router.get('/students/:id', ctrl.getStudentById);
-router.put('/students/:id/activate', ctrl.activateStudent);
-router.put('/students/:id/deactivate', ctrl.deactivateStudent);
-
-
+router.get("/students", ctrl.getStudents);
+router.get("/students/:id", ctrl.getStudentById);
+router.put("/students/:id/activate", ctrl.activateStudent);
+router.put("/students/:id/deactivate", ctrl.deactivateStudent);
+router.delete("/students/:id", ctrl.deleteStudent);
 
 module.exports = router;
