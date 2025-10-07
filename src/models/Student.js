@@ -1,32 +1,36 @@
-const mongoose = require('mongoose');
+const mongoose = require("mongoose");
 
 const addressSchema = new mongoose.Schema({
   fullAddress: { type: String, required: true },
   state: { type: String, required: true },
   district: { type: String, required: true },
-  country: { type: String, required: true, default: 'India' },
-  pincode: { type: String, required: true }
+  country: { type: String, required: true, default: "India" },
+  pincode: { type: String, required: true },
 });
 
 const courseSchema = new mongoose.Schema({
-      courseId: { type: mongoose.Schema.Types.ObjectId, ref: "Course" },
-    additionalCourseId: { type: mongoose.Schema.Types.ObjectId, ref: "AdditionalCourse" ,required: false},
-  paymentType: { type: String, required: true,enum: ['Full-payment', 'EMI'] },
-  downPayment:{ type: Number, required: false },
-  nextPaymentDueDate:{ type: Date, required: false },
-  courseFee: { type: Number, required: true },
-    batchId: { type: mongoose.Schema.Types.ObjectId, ref: "Batch" },
-  session: { type: String, required: true },
-  paymentMode: { 
-    type: String, 
-    required: true,
-    enum: ['UPI', 'Cash', 'Card', 'Net Banking']
+  courseId: { type: mongoose.Schema.Types.ObjectId, ref: "Course" },
+  additionalCourseId: {
+    type: mongoose.Schema.Types.ObjectId,
+    ref: "AdditionalCourse",
+    required: false,
   },
-    transactionId: { type: String }, // ✅ Added transactionId for UPI payments
+  paymentType: { type: String, required: true, enum: ["Full-payment", "EMI"] },
+  downPayment: { type: Number, required: false },
+  nextPaymentDueDate: { type: Date, required: false },
+  courseFee: { type: Number, required: true },
+  batchId: { type: mongoose.Schema.Types.ObjectId, ref: "Batch" },
+  session: { type: String, required: true },
+  paymentMode: {
+    type: String,
+    required: true,
+    enum: ["UPI", "Cash", "Card", "Net Banking"],
+  },
+  transactionId: { type: String }, // ✅ Added transactionId for UPI payments
 
   image: { type: String }, // Path to uploaded image
- 
-  referenceNumber: { type: String }
+
+  referenceNumber: { type: String },
 });
 
 const studentSchema = new mongoose.Schema({
@@ -34,16 +38,17 @@ const studentSchema = new mongoose.Schema({
   inchargeName: { type: String, required: true },
   studentName: { type: String, required: true },
   qrCode: { type: String, required: true },
-    registrationNo: { type: String, required: true },
+  registrationNo: { type: String, required: true },
   fathersName: { type: String, required: true },
-  mothersName: { type: String, required: true },
+  mothersName: { type: String, required: false },
+
   dateOfBirth: { type: Date, required: true },
   category: { type: String, required: true },
-  nationality: { type: String, required: true, default: 'Indian' },
-  gender: { 
-    type: String, 
+  nationality: { type: String, required: true, default: "Indian" },
+  gender: {
+    type: String,
     required: true,
-    enum: ['Male', 'Female', 'Other']
+    enum: ["Male", "Female", "Other"],
   },
   email: { type: String },
   mobileNumber: { type: String, required: true },
@@ -52,32 +57,33 @@ const studentSchema = new mongoose.Schema({
   presentAddress: { type: addressSchema, required: true },
   permanentAddress: { type: addressSchema, required: true },
   isPermanentSameAsPresent: { type: Boolean, default: false },
-  collegeName: { type: String, required: true },
+  collegeName: { type: String, required: false },
+
   className: { type: String, required: true },
-    image: { type: String }, // ✅ Moved here (student’s photo)
- imageKey: { type: String }, // Path to uploaded image
+  image: { type: String }, // ✅ Moved here (student’s photo)
+  imageKey: { type: String }, // Path to uploaded image
   courseDetails: { type: courseSchema, required: true },
-    isActive: { type: Boolean, default: false },  // ✅ Added field
-      centerCode: {
+  isActive: { type: Boolean, default: false }, // ✅ Added field
+  centerCode: {
     type: String,
     required: true,
-    trim: true
+    trim: true,
   },
 
   centerId: {
     type: mongoose.Schema.Types.ObjectId,
     ref: "Center",
-    required: true
+    required: true,
   },
 
   createdAt: { type: Date, default: Date.now },
-  updatedAt: { type: Date, default: Date.now }
+  updatedAt: { type: Date, default: Date.now },
 });
 
 // Update the updatedAt field before saving
-studentSchema.pre('save', function(next) {
+studentSchema.pre("save", function (next) {
   this.updatedAt = Date.now();
   next();
 });
 
-module.exports = mongoose.model('Student', studentSchema);
+module.exports = mongoose.model("Student", studentSchema);

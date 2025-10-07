@@ -18,13 +18,14 @@ const createFeeRecord = require("../../helpers/createFeeRecord");
 const { createLog } = require("../../helpers/logger");
 const { generateFeeReceipt } = require("../../utils/generateFeeReceipt");
 const { sendAdmissionWhatsapp } = require("../../utils/sendAdmissionWhatsapp");
-const { sendStudentAdmissionReceipt } = require("../../utils/sendStudentAdmissionReceipt");
+const {
+  sendStudentAdmissionReceipt,
+} = require("../../utils/sendStudentAdmissionReceipt");
 
 function generateReceiptNo() {
   const randomNum = Math.floor(10000 + Math.random() * 90000); // 5-digit random number
   return `TBREC${randomNum}`;
 }
-
 
 exports.createStudent = async (req, res) => {
   try {
@@ -46,7 +47,6 @@ exports.createStudent = async (req, res) => {
       Student,
       studentData.className
     );
-
     // ✅ Validate required fields
     const requiredFields = [
       "centerCode",
@@ -54,13 +54,11 @@ exports.createStudent = async (req, res) => {
       "inchargeName",
       "studentName",
       "fathersName",
-      "mothersName",
       "dateOfBirth",
       "category",
       "nationality",
       "gender",
       "mobileNumber",
-      "collegeName",
       "className",
     ];
     const missingFields = requiredFields.filter((f) => !studentData[f]);
@@ -159,7 +157,7 @@ exports.createStudent = async (req, res) => {
         const discountFile = req.files?.discountFile
           ? req.files.discountFile[0]
           : null;
-    const savedFee = await createFeeRecord(
+        const savedFee = await createFeeRecord(
           savedStudent,
           studentData.courseDetails,
           discountFile,
