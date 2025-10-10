@@ -530,6 +530,55 @@ exports.addPayment = async (req, res) => {
   }
 };
 
+// exports.getStudentFees = async (req, res) => {
+//   try {
+//     const { studentId } = req.params;
+
+//     const fees = await Fee.find({ studentId })
+//       .populate(
+//         "studentId",
+//         "-__v -qrCode -presentAddress -permanentAddress -courseDetails"
+//       ) // ✅ exclude qrCode
+//       .populate("courseId", "name fee") // keep course limited
+//       .populate("batchId", "batchName"); // keep batch limited
+
+//     if (!fees || fees.length === 0) {
+//       return res.status(404).json({
+//         success: false,
+//         message: "No fee records found for this student",
+//       });
+//     }
+
+//     // 🔍 Enrich paymentHistory with incharge_name
+//     for (let fee of fees) {
+//       for (let payment of fee.paymentHistory) {
+//         if (payment.inchargeCode) {
+//           const incharge = await AdmissionIncharge.findOne(
+//             { incharge_code: payment.inchargeCode },
+//             "incharge_name"
+//           );
+//           if (incharge) {
+//             payment = payment.toObject ? payment.toObject() : payment;
+//             payment.inchargeName = incharge.incharge_name;
+//           }
+//         }
+//       }
+//     }
+
+//     res.status(200).json({
+//       success: true,
+//       message: "Student fees retrieved successfully",
+//       data: fees,
+//     });
+//   } catch (error) {
+//     console.error("Error fetching student fees:", error);
+//     res.status(500).json({
+//       success: false,
+//       message: "Internal server error",
+//     });
+//   }
+// };
+
 exports.getStudentFees = async (req, res) => {
   try {
     const { studentId } = req.params;
@@ -538,9 +587,9 @@ exports.getStudentFees = async (req, res) => {
       .populate(
         "studentId",
         "-__v -qrCode -presentAddress -permanentAddress -courseDetails"
-      ) // ✅ exclude qrCode
-      .populate("courseId", "name fee") // keep course limited
-      .populate("batchId", "batchName"); // keep batch limited
+      )
+      .populate("courseId", "name fee")
+      .populate("batchId", "batchName");
 
     if (!fees || fees.length === 0) {
       return res.status(404).json({
@@ -549,20 +598,28 @@ exports.getStudentFees = async (req, res) => {
       });
     }
 
-    // 🔍 Enrich paymentHistory with incharge_name
+    // ✅ Enrich paymentHistory with inchargeName
     for (let fee of fees) {
+      const updatedPayments = [];
+
       for (let payment of fee.paymentHistory) {
+        let paymentObj = payment.toObject ? payment.toObject() : { ...payment };
+
         if (payment.inchargeCode) {
           const incharge = await AdmissionIncharge.findOne(
             { incharge_code: payment.inchargeCode },
             "incharge_name"
           );
           if (incharge) {
-            payment = payment.toObject ? payment.toObject() : payment;
-            payment.inchargeName = incharge.incharge_name;
+            paymentObj.inchargeName = incharge.incharge_name;
           }
         }
+
+        updatedPayments.push(paymentObj);
       }
+
+      // ✅ assign the enriched array back
+      fee.paymentHistory = updatedPayments;
     }
 
     res.status(200).json({
