@@ -589,7 +589,8 @@ exports.getStudentFees = async (req, res) => {
         "-__v -qrCode -presentAddress -permanentAddress -courseDetails"
       )
       .populate("courseId", "name fee")
-      .populate("batchId", "batchName");
+      .populate("batchId", "batchName")
+      .lean(); // ✅ Converts to plain JS objects so we can freely modify
 
     if (!fees || fees.length === 0) {
       return res.status(404).json({
@@ -598,28 +599,33 @@ exports.getStudentFees = async (req, res) => {
       });
     }
 
-    // ✅ Enrich paymentHistory with inchargeName
-    for (let fee of fees) {
-      const updatedPayments = [];
+    // ✅ Collect all unique inchargeCodes across all payments
+    const allCodes = [
+      ...new Set(
+        fees.flatMap((fee) =>
+          fee.paymentHistory.map((p) => p.inchargeCode).filter((code) => !!code)
+        )
+      ),
+    ];
 
-      for (let payment of fee.paymentHistory) {
-        let paymentObj = payment.toObject ? payment.toObject() : { ...payment };
+    // ✅ Fetch all incharges at once
+    const incharges = await AdmissionIncharge.find(
+      { incharge_code: { $in: allCodes } },
+      "incharge_code incharge_name"
+    ).lean();
 
-        if (payment.inchargeCode) {
-          const incharge = await AdmissionIncharge.findOne(
-            { incharge_code: payment.inchargeCode },
-            "incharge_name"
-          );
-          if (incharge) {
-            paymentObj.inchargeName = incharge.incharge_name;
-          }
-        }
+    const inchargeMap = Object.fromEntries(
+      incharges.map((i) => [i.incharge_code, i.incharge_name])
+    );
 
-        updatedPayments.push(paymentObj);
-      }
-
-      // ✅ assign the enriched array back
-      fee.paymentHistory = updatedPayments;
+    // ✅ Add inchargeName to each payment record
+    for (const fee of fees) {
+      fee.paymentHistory = fee.paymentHistory.map((payment) => ({
+        ...payment,
+        inchargeName: payment.inchargeCode
+          ? inchargeMap[payment.inchargeCode] || null
+          : null,
+      }));
     }
 
     res.status(200).json({
