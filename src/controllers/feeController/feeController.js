@@ -1069,6 +1069,7 @@ exports.getCollectFeesStudents = async (req, res) => {
         { className: searchRegex },
         { "presentAddress.city": searchRegex },
         { "presentAddress.state": searchRegex },
+        { registrationNo: searchRegex },
       ];
     }
 
