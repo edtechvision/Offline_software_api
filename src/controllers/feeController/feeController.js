@@ -677,20 +677,54 @@ exports.getPayments = async (req, res) => {
 
 // exports.getAllPayments = async (req, res) => {
 //   try {
-//     const fees = await Fee.find()
-//       .populate("studentId", "studentName registrationNo className")
+//     let {
+//       page = 1,
+//       limit = 10,
+//       paymentMode,
+//       search,
+//       startDate,
+//       endDate,
+//     } = req.query;
+
+//     page = parseInt(page) || 1;
+//     limit = parseInt(limit) || 10;
+
+//     // ✅ Build query conditions
+//     const matchStage = {};
+
+//     if (paymentMode) {
+//       matchStage["paymentHistory.paymentMode"] = paymentMode;
+//     }
+
+//     if (startDate || endDate) {
+//       matchStage["paymentHistory.paymentDate"] = {};
+//       if (startDate)
+//         matchStage["paymentHistory.paymentDate"]["$gte"] = new Date(startDate);
+//       if (endDate)
+//         matchStage["paymentHistory.paymentDate"]["$lte"] = new Date(endDate);
+//     }
+
+//     // ✅ Fetch fees with populated data
+//     const fees = await Fee.find(matchStage)
+//       .populate(
+//         "studentId",
+//         "studentName registrationNo className mobileNumber"
+//       )
 //       .populate("courseId", "name")
 //       .populate("batchId", "batchName");
 
 //     if (!fees || fees.length === 0) {
-//       return res.status(404).json({ success: false, message: "No payments found" });
+//       return res
+//         .status(404)
+//         .json({ success: false, message: "No payments found" });
 //     }
 
-//     // Flatten payment history with student & course info
-//     const allPayments = fees.flatMap((fee) =>
+//     // ✅ Flatten payment history
+//     let allPayments = fees.flatMap((fee) =>
 //       fee.paymentHistory.map((payment) => ({
 //         studentId: fee.studentId?._id,
 //         studentName: fee.studentId?.studentName,
+//         mobileNumber: fee.studentId?.mobileNumber,
 //         registrationNo: fee.studentId?.registrationNo,
 //         className: fee.studentId?.className,
 //         courseName: fee.courseId?.name,
@@ -707,11 +741,30 @@ exports.getPayments = async (req, res) => {
 //       }))
 //     );
 
+//     // ✅ Apply search filter
+//     if (search) {
+//       const searchLower = search.toLowerCase();
+//       allPayments = allPayments.filter(
+//         (p) =>
+//           p.studentName?.toLowerCase().includes(searchLower) ||
+//           p.registrationNo?.toLowerCase().includes(searchLower) ||
+//           p.className?.toLowerCase().includes(searchLower)
+//       );
+//     }
+
+//     // ✅ Apply pagination
+//     const totalPayments = allPayments.length;
+//     const startIndex = (page - 1) * limit;
+//     const paginatedPayments = allPayments.slice(startIndex, startIndex + limit);
+
 //     res.status(200).json({
 //       success: true,
 //       message: "All payments fetched successfully",
-//       totalPayments: allPayments.length,
-//       data: allPayments,
+//       page,
+//       limit,
+//       totalPayments,
+//       totalPages: Math.ceil(totalPayments / limit),
+//       data: paginatedPayments,
 //     });
 //   } catch (error) {
 //     console.error("Error fetching all payments:", error);
@@ -722,66 +775,6 @@ exports.getPayments = async (req, res) => {
 //   }
 // };
 
-// exports.revertPayment = async (req, res) => {
-//   try {
-//     const { feeId, receiptNo } = req.body;
-
-//     const fee = await Fee.findById(feeId);
-//     if (!fee) {
-//       return res
-//         .status(404)
-//         .json({ success: false, message: "Fee record not found" });
-//     }
-
-//     // ✅ Find payment by receiptNo
-//     const paymentIndex = fee.paymentHistory.findIndex(
-//       (p) => p.receiptNo === receiptNo
-//     );
-
-//     if (paymentIndex === -1) {
-//       return res
-//         .status(404)
-//         .json({ success: false, message: "Payment record not found" });
-//     }
-
-//     // ✅ Get payment to delete
-//     const paymentToDelete = fee.paymentHistory[paymentIndex];
-
-//     // ✅ Net effect (since amount is already final after discount)
-//     const netAmount =
-//       (paymentToDelete.amount || 0) + (paymentToDelete.fine || 0);
-
-//     // ✅ Deduct from totals
-//     fee.paidAmount = Math.max(0, fee.paidAmount - netAmount);
-//     fee.pendingAmount = Math.max(0, fee.totalFee - fee.paidAmount);
-
-//     // ✅ Remove payment from history
-//     fee.paymentHistory.splice(paymentIndex, 1);
-
-//     // ✅ Update status
-//     if (fee.pendingAmount === 0) {
-//       fee.status = "Completed";
-//     } else if (fee.paidAmount > 0) {
-//       fee.status = "Partial";
-//     } else {
-//       fee.status = "Pending";
-//     }
-
-//     const updatedFee = await fee.save();
-
-//     res.status(200).json({
-//       success: true,
-//       message: "Payment reverted (deleted) successfully",
-//       data: updatedFee,
-//     });
-//   } catch (error) {
-//     console.error("Error reverting payment:", error);
-//     res.status(500).json({
-//       success: false,
-//       message: "Internal server error",
-//     });
-//   }
-// };
 exports.getAllPayments = async (req, res) => {
   try {
     let {
@@ -796,7 +789,6 @@ exports.getAllPayments = async (req, res) => {
     page = parseInt(page) || 1;
     limit = parseInt(limit) || 10;
 
-    // ✅ Build query conditions
     const matchStage = {};
 
     if (paymentMode) {
@@ -811,7 +803,6 @@ exports.getAllPayments = async (req, res) => {
         matchStage["paymentHistory.paymentDate"]["$lte"] = new Date(endDate);
     }
 
-    // ✅ Fetch fees with populated data
     const fees = await Fee.find(matchStage)
       .populate(
         "studentId",
@@ -826,7 +817,6 @@ exports.getAllPayments = async (req, res) => {
         .json({ success: false, message: "No payments found" });
     }
 
-    // ✅ Flatten payment history
     let allPayments = fees.flatMap((fee) =>
       fee.paymentHistory.map((payment) => ({
         studentId: fee.studentId?._id,
@@ -858,6 +848,11 @@ exports.getAllPayments = async (req, res) => {
           p.className?.toLowerCase().includes(searchLower)
       );
     }
+
+    // ✅ Sort by latest payment first
+    allPayments.sort(
+      (a, b) => new Date(b.paymentDate) - new Date(a.paymentDate)
+    );
 
     // ✅ Apply pagination
     const totalPayments = allPayments.length;
