@@ -813,7 +813,10 @@ exports.getAllPayments = async (req, res) => {
 
     // ✅ Fetch fees with populated data
     const fees = await Fee.find(matchStage)
-      .populate("studentId", "studentName registrationNo className")
+      .populate(
+        "studentId",
+        "studentName registrationNo className mobileNumber"
+      )
       .populate("courseId", "name")
       .populate("batchId", "batchName");
 
@@ -828,6 +831,7 @@ exports.getAllPayments = async (req, res) => {
       fee.paymentHistory.map((payment) => ({
         studentId: fee.studentId?._id,
         studentName: fee.studentId?.studentName,
+        mobileNumber: fee.studentId?.mobileNumber,
         registrationNo: fee.studentId?.registrationNo,
         className: fee.studentId?.className,
         courseName: fee.courseId?.name,
