@@ -671,10 +671,10 @@ exports.getStudents = async (req, res) => {
         { inchargeName: searchRegex },
         { inchargeCode: searchRegex },
         { collegeName: searchRegex },
+        { registrationNo: searchRegex },
         { className: searchRegex },
         { "presentAddress.city": searchRegex },
         { "presentAddress.state": searchRegex },
-        { registrationNo: searchRegex },
       ];
     }
 
