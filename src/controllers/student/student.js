@@ -164,9 +164,9 @@ exports.createStudent = async (req, res) => {
           studentData.inchargeCode
         );
 
-        const receiptPath = await generateFeeReceipt(savedFee, savedStudent);
+        // const receiptPath = await generateFeeReceipt(savedFee, savedStudent);
 
-        await sendStudentAdmissionReceipt(savedStudent._id, receiptPath);
+        // await sendStudentAdmissionReceipt(savedStudent._id, receiptPath);
       } catch (err) {
         return res.status(400).json({
           success: false,
@@ -674,6 +674,7 @@ exports.getStudents = async (req, res) => {
         { className: searchRegex },
         { "presentAddress.city": searchRegex },
         { "presentAddress.state": searchRegex },
+        { registrationNo: searchRegex },
       ];
     }
 
