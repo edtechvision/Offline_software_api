@@ -21,6 +21,7 @@ const { sendAdmissionWhatsapp } = require("../../utils/sendAdmissionWhatsapp");
 const {
   sendStudentAdmissionReceipt,
 } = require("../../utils/sendStudentAdmissionReceipt");
+const { sendAdminWhatsapp } = require("../../utils/sendAdminWhatsapp");
 
 function generateReceiptNo() {
   const randomNum = Math.floor(10000 + Math.random() * 90000); // 5-digit random number
@@ -162,6 +163,10 @@ exports.createStudent = async (req, res) => {
           studentData.courseDetails,
           discountFile,
           studentData.inchargeCode
+        );
+
+        await sendAdminWhatsapp(savedStudent, savedFee).catch((err) =>
+          console.error("Failed to send admin WhatsApp alert:", err.message)
         );
 
         // const receiptPath = await generateFeeReceipt(savedFee, savedStudent);

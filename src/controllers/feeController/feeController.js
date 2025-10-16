@@ -4,6 +4,7 @@ const AdmissionIncharge = require("../../models/AdmissionIncharge");
 const Fee = require("../../models/Fee");
 const Student = require("../../models/Student");
 const s3 = require("../../utils/s3");
+const { sendPaymentWhatsapp } = require("../../utils/sendPaymentWhatsapp");
 
 // ✅ Create Fee Record for a Student
 exports.createFee = async (req, res) => {
@@ -495,6 +496,14 @@ exports.addPayment = async (req, res) => {
 
     const updatedFee = await fee.save();
 
+    // ✅ Get last payment entry
+    const lastPayment =
+      updatedFee.paymentHistory[updatedFee.paymentHistory.length - 1];
+
+    // ✅ Send WhatsApp alert asynchronously (non-blocking)
+    sendPaymentWhatsapp(updatedFee, lastPayment).catch((err) =>
+      console.error("Failed to send payment WhatsApp alert:", err.message)
+    );
     // ✅ Async-safe Log
     createLog({
       action: "PAYMENT_ADDED",

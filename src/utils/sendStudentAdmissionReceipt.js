@@ -5,14 +5,15 @@ async function sendStudentAdmissionReceipt(studentId, receiptPath) {
   try {
     // ✅ Fetch student + populate relational fields
     const student = await Student.findById(studentId)
-      .populate("courseDetails.courseId")       // course name, etc.
+      .populate("courseDetails.courseId") // course name, etc.
       .populate("courseDetails.additionalCourseId")
-      .populate("courseDetails.batchId")        // batch info
-      .populate("centerId");                    // center info
+      .populate("courseDetails.batchId") // batch info
+      .populate("centerId"); // center info
 
     if (!student) {
       throw new Error("Student not found");
     }
+    console.log(student);
 
     // ✅ Prepare student object for WhatsApp template
     const studentData = {
