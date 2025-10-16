@@ -24,7 +24,7 @@ async function sendPaymentWhatsapp(fee, paymentEntry) {
       apiKey:
         "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpZCI6IjY2Zjk1YzE2ZmRiMGIxMGI3OWMyNGExZiIsIm5hbWUiOiJUQVJHRVQgQk9BUkQiLCJhcHBOYW1lIjoiQWlTZW5zeSIsImNsaWVudElkIjoiNjZmOTVjMTZmZGIwYjEwYjc5YzI0YTE2IiwiYWN0aXZlUGxhbiI6Ik5PTkUiLCJpYXQiOjE3Mjc2MTgwNzB9.QzLBhqmZyhlLmWh6aIL5V40IWVxlLbSUL7g6bP7C8Ok",
       campaignName: "dues_clear",
-      destination: safe(student.mobileNumber),
+      destination: "9263991125",
       userName: "TARGET BOARD",
       templateParams: [
         safe(student.studentName), // {{1}} Name
