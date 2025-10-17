@@ -2,6 +2,7 @@ const Admin = require("../../models/Admin");
 const Center = require("../../models/Center");
 const bcrypt = require("bcryptjs");
 const jwt = require("jsonwebtoken");
+const Staff = require("../../models/Staff");
 
 // @desc    Unified login for Admin & Center
 // @route   POST /api/auth/login
@@ -125,5 +126,38 @@ const loginIncharge = async (req, res) => {
     res.status(500).json({ message: "Something went wrong", error: error.message });
   }
 };
+const loginStaff = async (req, res) => {
+  try {
+    const { staffcode, password } = req.body;
+    console.log(staffcode, password)
 
-module.exports = { loginAdmin,loginIncharge };
+    const staff = await Staff.findOne({ staffcode });
+    if (!staff) {
+      return res.status(400).json({ message: "Invalid credentials" });
+    }
+
+    const isMatch = await bcrypt.compare(password, staff.password);
+    if (!isMatch) {
+      return res.status(400).json({ message: "Invalid credentials" });
+    }
+
+    const token = jwt.sign(
+      { id: staff._id, role: "staff" },
+      process.env.JWT_SECRET || "your_jwt_secret",
+    );
+
+    const { password: _, ...staffData } = staff.toObject();
+
+    res.json({
+      message: "Staff login successful",
+      role: "staff",
+      token,
+      user: staffData,
+    });
+  } catch (error) {
+    console.error("Staff Login Error:", error);
+    res.status(500).json({ message: "Something went wrong", error: error.message });
+  }
+};
+
+module.exports = { loginAdmin,loginIncharge,loginStaff };
