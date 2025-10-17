@@ -511,13 +511,13 @@ exports.updateStudent = async (req, res) => {
     }
 
     // ✅ Handle image replacement
-    if (req.file) {
+    if (req.files?.image) {
       if (existingStudent.image) {
         const key = existingStudent.image.split("/").slice(3).join("/");
         await deleteImage(key);
       }
       try {
-        const { image } = await uploadImage(req.file);
+        const { image } = await uploadImage(req.files.image[0]);
         updateData.image = image;
       } catch {
         return res
