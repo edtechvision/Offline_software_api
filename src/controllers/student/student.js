@@ -864,3 +864,48 @@ exports.deleteStudent = async (req, res) => {
       .json({ success: false, message: "Internal server error" });
   }
 };
+
+
+// ✅ Update ID Card Issued Status
+exports.updateIdCardStatus = async (req, res) => {
+  try {
+    const { studentId } = req.params;
+    const { idCardIssued } = req.body;
+
+    if (typeof idCardIssued !== "boolean") {
+      return res.status(400).json({ message: "idCardIssued must be true or false." });
+    }
+
+    const student = await Student.findByIdAndUpdate(
+      studentId,
+      { idCardIssued, updatedAt: Date.now() },
+      { new: true }
+    );
+
+    if (!student) {
+      return res.status(404).json({ message: "Student not found." });
+    }
+
+    res.status(200).json({
+      message: `ID Card status updated successfully.`,
+      student,
+    });
+  } catch (error) {
+    console.error("Error updating ID card status:", error);
+    res.status(500).json({ message: "Internal Server Error", error });
+  }
+};
+
+// ✅ Get students with ID card status filter
+exports.getStudentsByIdCardStatus = async (req, res) => {
+  try {
+    const { issued } = req.query; // Example: /students/idcard?issued=true
+    const filter = issued !== undefined ? { idCardIssued: issued === "true" } : {};
+
+    const students = await Student.find(filter);
+    res.status(200).json(students);
+  } catch (error) {
+    console.error("Error fetching students:", error);
+    res.status(500).json({ message: "Internal Server Error", error });
+  }
+};

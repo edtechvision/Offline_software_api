@@ -998,16 +998,72 @@ exports.revertPayment = async (req, res) => {
   }
 };
 
+// exports.getPendingFees = async (req, res) => {
+//   try {
+//     const fees = await Fee.find({ pendingAmount: { $gt: 0 } }) // only students with pending fees
+//       .populate("studentId", "studentName registrationNo mobileNumber email")
+//       .populate("courseId", "name");
+
+//     if (!fees || fees.length === 0) {
+//       return res
+//         .status(404)
+//         .json({ success: false, message: "No pending fees found" });
+//     }
+
+//     const pendingFeesList = fees.map((fee) => ({
+//       studentId: fee.studentId?._id,
+//       studentName: fee.studentId?.studentName,
+//       studentEmail: fee.studentId?.email,
+//       registrationNo: fee.studentId?.registrationNo,
+//       contactNumber: fee.studentId?.mobileNumber,
+//       courseName: fee.courseId?.name,
+//       courseFee: fee.totalFee,
+//       totalReceivedFees: fee.paidAmount,
+//       pendingFees: fee.pendingAmount,
+//       nextDueDate: fee.nextPaymentDueDate,
+//     }));
+
+//     res.status(200).json({
+//       success: true,
+//       message: "Pending fees list fetched successfully",
+//       totalStudents: pendingFeesList.length,
+//       data: pendingFeesList,
+//     });
+//   } catch (error) {
+//     console.error("Error fetching pending fees:", error);
+//     res.status(500).json({
+//       success: false,
+//       message: "Internal server error",
+//     });
+//   }
+// };
+
 exports.getPendingFees = async (req, res) => {
   try {
-    const fees = await Fee.find({ pendingAmount: { $gt: 0 } }) // only students with pending fees
+    // 📌 Get pagination parameters from query
+    let { page = 1, limit = 10 } = req.query;
+    page = parseInt(page);
+    limit = parseInt(limit);
+
+    // 🧮 Calculate how many documents to skip
+    const skip = (page - 1) * limit;
+
+    // 🧾 Query pending fees with pagination
+    const fees = await Fee.find({ pendingAmount: { $gt: 0 } })
       .populate("studentId", "studentName registrationNo mobileNumber email")
-      .populate("courseId", "name");
+      .populate("courseId", "name")
+      .skip(skip)
+      .limit(limit)
+      .sort({ nextPaymentDueDate: 1 }); // Optional: sort by next due date ascending
+
+    // 🧮 Get total count for pagination metadata
+    const totalCount = await Fee.countDocuments({ pendingAmount: { $gt: 0 } });
 
     if (!fees || fees.length === 0) {
-      return res
-        .status(404)
-        .json({ success: false, message: "No pending fees found" });
+      return res.status(404).json({
+        success: false,
+        message: "No pending fees found",
+      });
     }
 
     const pendingFeesList = fees.map((fee) => ({
@@ -1023,10 +1079,14 @@ exports.getPendingFees = async (req, res) => {
       nextDueDate: fee.nextPaymentDueDate,
     }));
 
+    // ✅ Send paginated response
     res.status(200).json({
       success: true,
       message: "Pending fees list fetched successfully",
-      totalStudents: pendingFeesList.length,
+      totalStudents: totalCount,
+      currentPage: page,
+      totalPages: Math.ceil(totalCount / limit),
+      pageSize: pendingFeesList.length,
       data: pendingFeesList,
     });
   } catch (error) {

@@ -64,6 +64,7 @@ const studentSchema = new mongoose.Schema({
   imageKey: { type: String }, // Path to uploaded image
   courseDetails: { type: courseSchema, required: true },
   isActive: { type: Boolean, default: false }, // ✅ Added field
+  idCardIssued: { type: Boolean, default: false }, // ✅ Added field
   centerCode: {
     type: String,
     required: true,

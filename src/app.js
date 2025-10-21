@@ -44,6 +44,9 @@ async function backfillFeeLogs() {
     return { success: false, message: err.message };
   }
 }
+
+
+
 // backfillFeeLogs();
 const routes = require("./routes/index");
 
