@@ -146,7 +146,7 @@ exports.getAttendance = async (req, res) => {
     // ✅ Fetch attendance with population
     const [attendances, total] = await Promise.all([
       Attendance.find(query)
-        .populate("studentId", "name registrationNo")
+        .populate("studentId", "studentName registrationNo")
         .populate("markedBy", "staffname staffcode")
         .sort({ [sortBy]: sortOrder })
         .skip(skip)
