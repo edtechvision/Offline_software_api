@@ -25,6 +25,10 @@ const inquirySchema = new mongoose.Schema({
     type: String,
     required: true,
   },
+  notes: {
+    type: String, // or [String] if multiple notes
+    default: "",  // optional default value
+  },
 });
 
 module.exports = mongoose.model("Inquiry", inquirySchema);
