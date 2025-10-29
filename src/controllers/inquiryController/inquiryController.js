@@ -31,6 +31,44 @@ exports.createInquiry = async (req, res) => {
 };
 
 // Get All Inquiries
+// exports.getInquiries = async (req, res) => {
+//   try {
+//     const page = parseInt(req.query.page) || 1;
+//     const limit = parseInt(req.query.limit) || 10;
+//     const skip = (page - 1) * limit;
+
+//     const search = req.query.search || "";
+
+//     // Build search filter
+//     const searchFilter = search
+//       ? {
+//           $or: [
+//             { name: { $regex: search, $options: "i" } },
+//             { mobile: { $regex: search, $options: "i" } },
+//             { center: { $regex: search, $options: "i" } },
+//           ],
+//         }
+//       : {};
+
+//     const total = await Inquiry.countDocuments(searchFilter);
+//     const inquiries = await Inquiry.find(searchFilter)
+//       .skip(skip)
+//       .limit(limit)
+//       .sort({ enquiry_date: -1 });
+
+//     res.json({
+//       total,
+//       page,
+//       pages: Math.ceil(total / limit),
+//       limit,
+//       data: inquiries,
+//     });
+//   } catch (err) {
+//     console.error("Error fetching inquiries:", err.message);
+//     res.status(500).json({ message: "Server error. Please try again later." });
+//   }
+// };
+
 exports.getInquiries = async (req, res) => {
   try {
     const page = parseInt(req.query.page) || 1;
@@ -38,8 +76,9 @@ exports.getInquiries = async (req, res) => {
     const skip = (page - 1) * limit;
 
     const search = req.query.search || "";
+    const status = req.query.status || "all"; // 👈 new query param
 
-    // Build search filter
+    // Build base search filter
     const searchFilter = search
       ? {
           $or: [
@@ -49,6 +88,11 @@ exports.getInquiries = async (req, res) => {
           ],
         }
       : {};
+
+    // 👇 Add status filtering if provided and not "all"
+    if (status && status !== "all") {
+      searchFilter.status = status;
+    }
 
     const total = await Inquiry.countDocuments(searchFilter);
     const inquiries = await Inquiry.find(searchFilter)
@@ -68,6 +112,7 @@ exports.getInquiries = async (req, res) => {
     res.status(500).json({ message: "Server error. Please try again later." });
   }
 };
+
 // Get Single Inquiry
 exports.getInquiryById = async (req, res) => {
   try {
