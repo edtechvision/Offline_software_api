@@ -102,3 +102,36 @@ exports.deleteInquiry = async (req, res) => {
     res.status(500).json({ message: err.message });
   }
 };
+
+exports.updateInquiryStatus = async (req, res) => {
+  try {
+    const { id } = req.params;
+    const { status, followUpDate } = req.body;
+
+    const validStatuses = ["new", "contacted", "follow-up", "converted"];
+    if (status && !validStatuses.includes(status)) {
+      return res.status(400).json({ message: "Invalid status value." });
+    }
+
+    const updatedInquiry = await Inquiry.findByIdAndUpdate(
+      id,
+      {
+        ...(status && { status }),
+        ...(followUpDate && { followUpDate }),
+      },
+      { new: true }
+    );
+
+    if (!updatedInquiry) {
+      return res.status(404).json({ message: "Inquiry not found." });
+    }
+
+    res.status(200).json({
+      message: "Inquiry updated successfully",
+      data: updatedInquiry,
+    });
+  } catch (err) {
+    console.error("Error updating inquiry:", err.message);
+    res.status(500).json({ message: "Server error. Please try again later." });
+  }
+};

@@ -29,6 +29,16 @@ const inquirySchema = new mongoose.Schema({
     type: String, // or [String] if multiple notes
     default: "",  // optional default value
   },
+  // ✅ New fields
+  status: {
+    type: String,
+    enum: ["new", "contacted", "follow-up", "converted"], // predefined statuses
+    default: "new", // default when created
+  },
+  followUpDate: {
+    type: Date,
+    default: null, // optional, can be set later
+  },
 });
 
 module.exports = mongoose.model("Inquiry", inquirySchema);
