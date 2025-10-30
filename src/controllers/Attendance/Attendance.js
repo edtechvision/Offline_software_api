@@ -136,9 +136,21 @@ exports.markAttendance = async (req, res) => {
     });
 
     if (existingAttendance) {
+      // Even if already marked, return stats so staff can see summary
+      const totalPresent = await Attendance.countDocuments({
+        date: { $gte: startOfDay, $lte: endOfDay },
+      });
+      const totalStudents = await Student.countDocuments();
+      const totalAbsent = totalStudents - totalPresent;
+
       return res.status(400).json({
         success: false,
         message: "Attendance already marked for today",
+        stats: {
+          totalScanned: totalPresent,
+          totalPresent,
+          totalAbsent,
+        },
       });
     }
 
@@ -147,6 +159,7 @@ exports.markAttendance = async (req, res) => {
       studentId: student._id,
       registrationNo: student.registrationNo,
       markedBy: staff._id,
+      date: new Date(),
     });
 
     const savedAttendance = await attendance.save();
@@ -180,6 +193,13 @@ exports.markAttendance = async (req, res) => {
       };
     }
 
+    // ✅ Calculate today's stats
+    const totalPresent = await Attendance.countDocuments({
+      date: { $gte: startOfDay, $lte: endOfDay },
+    });
+    const totalStudents = await Student.countDocuments();
+    const totalAbsent = totalStudents - totalPresent;
+
     // ✅ Final response
     res.status(201).json({
       success: true,
@@ -187,6 +207,11 @@ exports.markAttendance = async (req, res) => {
       data: {
         attendance: populatedAttendance,
         pendingFees: pendingFeesData,
+        stats: {
+          totalScanned: totalPresent, // same as total present
+          totalPresent,
+          totalAbsent,
+        },
       },
     });
   } catch (error) {
@@ -198,6 +223,7 @@ exports.markAttendance = async (req, res) => {
     });
   }
 };
+
 
 exports.getAttendance = async (req, res) => {
   try {
