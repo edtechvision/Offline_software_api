@@ -136,21 +136,9 @@ exports.markAttendance = async (req, res) => {
     });
 
     if (existingAttendance) {
-      // Even if already marked, return stats so staff can see summary
-      const totalPresent = await Attendance.countDocuments({
-        date: { $gte: startOfDay, $lte: endOfDay },
-      });
-      const totalStudents = await Student.countDocuments();
-      const totalAbsent = totalStudents - totalPresent;
-
       return res.status(400).json({
         success: false,
         message: "Attendance already marked for today",
-        stats: {
-          totalScanned: totalPresent,
-          totalPresent,
-          totalAbsent,
-        },
       });
     }
 
@@ -159,7 +147,6 @@ exports.markAttendance = async (req, res) => {
       studentId: student._id,
       registrationNo: student.registrationNo,
       markedBy: staff._id,
-      date: new Date(),
     });
 
     const savedAttendance = await attendance.save();
@@ -193,13 +180,6 @@ exports.markAttendance = async (req, res) => {
       };
     }
 
-    // ✅ Calculate today's stats
-    const totalPresent = await Attendance.countDocuments({
-      date: { $gte: startOfDay, $lte: endOfDay },
-    });
-    const totalStudents = await Student.countDocuments();
-    const totalAbsent = totalStudents - totalPresent;
-
     // ✅ Final response
     res.status(201).json({
       success: true,
@@ -207,11 +187,6 @@ exports.markAttendance = async (req, res) => {
       data: {
         attendance: populatedAttendance,
         pendingFees: pendingFeesData,
-        stats: {
-          totalScanned: totalPresent, // same as total present
-          totalPresent,
-          totalAbsent,
-        },
       },
     });
   } catch (error) {
@@ -223,7 +198,6 @@ exports.markAttendance = async (req, res) => {
     });
   }
 };
-
 
 exports.getAttendance = async (req, res) => {
   try {
@@ -237,26 +211,31 @@ exports.getAttendance = async (req, res) => {
       order = "desc",
     } = req.query;
 
-    // Convert to integers
     page = parseInt(page);
     limit = parseInt(limit);
 
-    // ✅ Base query object
+    // ✅ Base query
     const query = {};
 
-    // ✅ Date range filter (optional)
+    // ✅ Date range filter (default to today if not provided)
+    const today = new Date();
+    const defaultStart = new Date(today.setHours(0, 0, 0, 0));
+    const defaultEnd = new Date(today.setHours(23, 59, 59, 999));
+
     if (startDate || endDate) {
       query.date = {};
       if (startDate) query.date.$gte = new Date(startDate);
       if (endDate) query.date.$lte = new Date(endDate);
+    } else {
+      // default to today’s attendance
+      query.date = { $gte: defaultStart, $lte: defaultEnd };
     }
 
-    // ✅ Search across Student or Staff fields
+    // ✅ Search filter (student/staff)
     if (search.trim() !== "") {
-      // find student IDs or staff IDs matching the search term
       const students = await Student.find({
         $or: [
-          { name: { $regex: search, $options: "i" } },
+          { studentName: { $regex: search, $options: "i" } },
           { registrationNo: { $regex: search, $options: "i" } },
         ],
       }).select("_id");
@@ -277,11 +256,11 @@ exports.getAttendance = async (req, res) => {
       ];
     }
 
-    // ✅ Pagination + sorting
+    // ✅ Pagination & sorting
     const skip = (page - 1) * limit;
     const sortOrder = order === "asc" ? 1 : -1;
 
-    // ✅ Fetch attendance with population
+    // ✅ Fetch paginated attendance data
     const [attendances, total] = await Promise.all([
       Attendance.find(query)
         .populate("studentId", "studentName registrationNo")
@@ -292,12 +271,25 @@ exports.getAttendance = async (req, res) => {
       Attendance.countDocuments(query),
     ]);
 
-    // ✅ Response
+    // ✅ Calculate attendance stats for the same period
+    const totalPresent = await Attendance.countDocuments(query);
+    const totalStudents = await Student.countDocuments();
+    const totalAbsent = totalStudents - totalPresent;
+
+    const totalScanned = totalPresent; // same as totalPresent
+
+    // ✅ Final Response
     res.status(200).json({
       success: true,
+      message: "Attendance list fetched successfully",
       totalRecords: total,
       currentPage: page,
       totalPages: Math.ceil(total / limit),
+      stats: {
+        totalScanned,
+        totalPresent,
+        totalAbsent,
+      },
       results: attendances,
     });
   } catch (error) {
@@ -309,3 +301,88 @@ exports.getAttendance = async (req, res) => {
     });
   }
 };
+
+// exports.getAttendance = async (req, res) => {
+//   try {
+//     let {
+//       page = 1,
+//       limit = 10,
+//       search = "",
+//       startDate,
+//       endDate,
+//       sortBy = "date",
+//       order = "desc",
+//     } = req.query;
+
+//     // Convert to integers
+//     page = parseInt(page);
+//     limit = parseInt(limit);
+
+//     // ✅ Base query object
+//     const query = {};
+
+//     // ✅ Date range filter (optional)
+//     if (startDate || endDate) {
+//       query.date = {};
+//       if (startDate) query.date.$gte = new Date(startDate);
+//       if (endDate) query.date.$lte = new Date(endDate);
+//     }
+
+//     // ✅ Search across Student or Staff fields
+//     if (search.trim() !== "") {
+//       // find student IDs or staff IDs matching the search term
+//       const students = await Student.find({
+//         $or: [
+//           { name: { $regex: search, $options: "i" } },
+//           { registrationNo: { $regex: search, $options: "i" } },
+//         ],
+//       }).select("_id");
+
+//       const staffs = await Staff.find({
+//         $or: [
+//           { staffname: { $regex: search, $options: "i" } },
+//           { staffcode: { $regex: search, $options: "i" } },
+//         ],
+//       }).select("_id");
+
+//       const studentIds = students.map((s) => s._id);
+//       const staffIds = staffs.map((s) => s._id);
+
+//       query.$or = [
+//         { studentId: { $in: studentIds } },
+//         { markedBy: { $in: staffIds } },
+//       ];
+//     }
+
+//     // ✅ Pagination + sorting
+//     const skip = (page - 1) * limit;
+//     const sortOrder = order === "asc" ? 1 : -1;
+
+//     // ✅ Fetch attendance with population
+//     const [attendances, total] = await Promise.all([
+//       Attendance.find(query)
+//         .populate("studentId", "studentName registrationNo")
+//         .populate("markedBy", "staffname staffcode")
+//         .sort({ [sortBy]: sortOrder })
+//         .skip(skip)
+//         .limit(limit),
+//       Attendance.countDocuments(query),
+//     ]);
+
+//     // ✅ Response
+//     res.status(200).json({
+//       success: true,
+//       totalRecords: total,
+//       currentPage: page,
+//       totalPages: Math.ceil(total / limit),
+//       results: attendances,
+//     });
+//   } catch (error) {
+//     console.error("Get Attendance Error:", error);
+//     res.status(500).json({
+//       success: false,
+//       message: "Internal server error",
+//       error: error.message,
+//     });
+//   }
+// };
