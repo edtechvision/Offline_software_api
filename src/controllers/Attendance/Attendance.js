@@ -2,6 +2,7 @@ const Student = require("../../models/Student");
 const Attendance = require("../../models/Attendance");
 const Staff = require("../../models/Staff");
 const Fee = require("../../models/Fee");
+const Holiday = require("../../models/Holiday");
 
 // exports.markAttendance = async (req, res) => {
 //   try {
@@ -386,3 +387,125 @@ exports.getAttendance = async (req, res) => {
 //     });
 //   }
 // };
+
+exports.getStudentAttendanceSummary = async (req, res) => {
+  try {
+    const { studentId } = req.params;
+
+    // ✅ Check if student exists
+    const student = await Student.findById(studentId);
+    if (!student) {
+      return res.status(404).json({
+        success: false,
+        message: "Student not found",
+      });
+    }
+
+    const now = new Date();
+    const currentYear = now.getFullYear();
+
+    // ✅ Get all attendances of this student for the current year
+    const attendances = await Attendance.find({
+      studentId,
+      date: {
+        $gte: new Date(`${currentYear}-01-01T00:00:00.000Z`),
+        $lte: new Date(`${currentYear}-12-31T23:59:59.999Z`),
+      },
+    }).sort({ date: 1 });
+
+    // ✅ Get all holidays in this year
+    const holidays = await Holiday.find({
+      date: {
+        $gte: new Date(`${currentYear}-01-01T00:00:00.000Z`),
+        $lte: new Date(`${currentYear}-12-31T23:59:59.999Z`),
+      },
+    });
+
+    // Convert holiday dates to set for faster lookup
+    const holidayDates = new Set(holidays.map((h) => h.date.toDateString()));
+
+    // ✅ Create helper to check if Sunday
+    const isSunday = (date) => new Date(date).getDay() === 0;
+
+    // ✅ Generate list of all days from Jan 1 to today
+    const allDays = [];
+    let day = new Date(`${currentYear}-01-01`);
+    const today = new Date();
+    while (day <= today) {
+      // Exclude Sundays
+      if (!isSunday(day)) {
+        allDays.push(new Date(day));
+      }
+      day.setDate(day.getDate() + 1);
+    }
+
+    // ✅ Prepare sets for attended days
+    const presentDates = new Set(attendances.map((a) => a.date.toDateString()));
+
+    // ✅ Calculate totals
+    let totalPresent = 0;
+    let totalAbsent = 0;
+    let totalHolidays = 0;
+
+    for (let d of allDays) {
+      const dateStr = d.toDateString();
+
+      if (holidayDates.has(dateStr)) {
+        totalHolidays++;
+      } else if (presentDates.has(dateStr)) {
+        totalPresent++;
+      } else {
+        totalAbsent++;
+      }
+    }
+
+    // ✅ Monthly breakdown
+    const monthlyAttendance = {};
+
+    for (let month = 0; month < 12; month++) {
+      const monthName = new Date(currentYear, month).toLocaleString("default", {
+        month: "long",
+      });
+
+      const monthDays = allDays.filter((d) => d.getMonth() === month);
+      const monthHolidays = monthDays.filter((d) =>
+        holidayDates.has(d.toDateString())
+      ).length;
+      const monthPresents = monthDays.filter((d) =>
+        presentDates.has(d.toDateString())
+      ).length;
+      const monthAbsents = monthDays.length - (monthPresents + monthHolidays);
+
+      monthlyAttendance[monthName] = {
+        totalDays: monthDays.length,
+        present: monthPresents,
+        absent: monthAbsents,
+        holidays: monthHolidays,
+      };
+    }
+
+    // ✅ Final response
+    res.status(200).json({
+      success: true,
+      message: "Attendance summary fetched successfully",
+      data: {
+        student: {
+          id: student._id,
+          name: student.studentName,
+          registrationNo: student.registrationNo,
+        },
+        totalPresent,
+        totalAbsent,
+        totalHolidays,
+        monthlyAttendance,
+      },
+    });
+  } catch (error) {
+    console.error("Error fetching attendance summary:", error);
+    res.status(500).json({
+      success: false,
+      message: "Internal server error",
+      error: error.message,
+    });
+  }
+};

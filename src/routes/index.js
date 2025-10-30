@@ -17,6 +17,7 @@ const logsRoute = require("../routes/logs/logs.routes");
 const inquiryRoute = require("../routes/inquiryRoutes/inquiryRoutes");
 const attendanceRoute = require("../routes/Attendance/Attendance");
 const staffRoute = require("../routes/staff/staffRoutes");
+const holidayRoute = require("../routes/holidayRoutes/holidayRoutes");
 
 const router = express.Router();
 
@@ -36,5 +37,6 @@ router.use("/api/v1", logsRoute);
 router.use("/api/v1", inquiryRoute);
 router.use("/api/v1", attendanceRoute);
 router.use("/api/v1", staffRoute);
+router.use("/api/v1", holidayRoute);
 
 module.exports = router;
