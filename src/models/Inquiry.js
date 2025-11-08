@@ -11,11 +11,11 @@ const inquirySchema = new mongoose.Schema({
   },
   address: {
     type: String,
-    required: true,
+    required: false,
   },
   class: {
     type: String,
-    required: true,
+    required: false,
   },
   enquiry_date: {
     type: Date,
@@ -23,7 +23,7 @@ const inquirySchema = new mongoose.Schema({
   },
   center: {
     type: String,
-    required: true,
+    required: false,
   },
   notes: {
     type: String, // or [String] if multiple notes

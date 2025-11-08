@@ -784,6 +784,109 @@ exports.getPayments = async (req, res) => {
 //   }
 // };
 
+// exports.getAllPayments = async (req, res) => {
+//   try {
+//     let {
+//       page = 1,
+//       limit = 10,
+//       paymentMode,
+//       search,
+//       startDate,
+//       endDate,
+//     } = req.query;
+
+//     page = parseInt(page) || 1;
+//     limit = parseInt(limit) || 10;
+
+//     const matchStage = {};
+
+//     if (paymentMode) {
+//       matchStage["paymentHistory.paymentMode"] = paymentMode;
+//     }
+
+//     if (startDate || endDate) {
+//       matchStage["paymentHistory.paymentDate"] = {};
+//       if (startDate)
+//         matchStage["paymentHistory.paymentDate"]["$gte"] = new Date(startDate);
+//       if (endDate)
+//         matchStage["paymentHistory.paymentDate"]["$lte"] = new Date(endDate);
+//     }
+
+//     const fees = await Fee.find(matchStage)
+//       .populate(
+//         "studentId",
+//         "studentName registrationNo className mobileNumber"
+//       )
+//       .populate("courseId", "name")
+//       .populate("batchId", "batchName");
+
+//     if (!fees || fees.length === 0) {
+//       return res
+//         .status(404)
+//         .json({ success: false, message: "No payments found" });
+//     }
+
+//     let allPayments = fees.flatMap((fee) =>
+//       fee.paymentHistory.map((payment) => ({
+//         studentId: fee.studentId?._id,
+//         studentName: fee.studentId?.studentName,
+//         mobileNumber: fee.studentId?.mobileNumber,
+//         registrationNo: fee.studentId?.registrationNo,
+//         className: fee.studentId?.className,
+//         courseName: fee.courseId?.name,
+//         batchName: fee.batchId?.batchName,
+//         totalFee: fee.totalFee,
+//         paymentDate: payment.paymentDate,
+//         amount: payment.amount,
+//         previousReceivedAmount: payment.previousReceivedAmount,
+//         pendingAmountAfterPayment: payment.pendingAmountAfterPayment,
+//         paymentMode: payment.paymentMode,
+//         transactionId: payment.transactionId,
+//         remarks: payment.remarks,
+//         receiptNo: payment.receiptNo,
+//       }))
+//     );
+
+//     // ✅ Apply search filter
+//     if (search) {
+//       const searchLower = search.toLowerCase();
+//       allPayments = allPayments.filter(
+//         (p) =>
+//           p.studentName?.toLowerCase().includes(searchLower) ||
+//           p.registrationNo?.toLowerCase().includes(searchLower) ||
+//           p.className?.toLowerCase().includes(searchLower)
+//       );
+//     }
+
+//     // ✅ Sort by latest payment first
+//     allPayments.sort(
+//       (a, b) => new Date(b.paymentDate) - new Date(a.paymentDate)
+//     );
+
+//     // ✅ Apply pagination
+//     const totalPayments = allPayments.length;
+//     const startIndex = (page - 1) * limit;
+//     const paginatedPayments = allPayments.slice(startIndex, startIndex + limit);
+
+//     res.status(200).json({
+//       success: true,
+//       message: "All payments fetched successfully",
+//       page,
+//       limit,
+//       totalPayments,
+//       totalPages: Math.ceil(totalPayments / limit),
+//       data: paginatedPayments,
+//     });
+//   } catch (error) {
+//     console.error("Error fetching all payments:", error);
+//     res.status(500).json({
+//       success: false,
+//       message: "Internal server error",
+//     });
+//   }
+// };
+
+
 exports.getAllPayments = async (req, res) => {
   try {
     let {
@@ -800,10 +903,12 @@ exports.getAllPayments = async (req, res) => {
 
     const matchStage = {};
 
+    // Optional filter for payment mode
     if (paymentMode) {
       matchStage["paymentHistory.paymentMode"] = paymentMode;
     }
 
+    // Rough filter for performance
     if (startDate || endDate) {
       matchStage["paymentHistory.paymentDate"] = {};
       if (startDate)
@@ -826,6 +931,7 @@ exports.getAllPayments = async (req, res) => {
         .json({ success: false, message: "No payments found" });
     }
 
+    // Flatten all payment records
     let allPayments = fees.flatMap((fee) =>
       fee.paymentHistory.map((payment) => ({
         studentId: fee.studentId?._id,
@@ -847,6 +953,16 @@ exports.getAllPayments = async (req, res) => {
       }))
     );
 
+    // ✅ Fix: Filter individual payments by date range
+    if (startDate || endDate) {
+      const start = startDate ? new Date(startDate) : null;
+      const end = endDate ? new Date(endDate) : null;
+      allPayments = allPayments.filter((p) => {
+        const date = new Date(p.paymentDate);
+        return (!start || date >= start) && (!end || date <= end);
+      });
+    }
+
     // ✅ Apply search filter
     if (search) {
       const searchLower = search.toLowerCase();
@@ -863,7 +979,7 @@ exports.getAllPayments = async (req, res) => {
       (a, b) => new Date(b.paymentDate) - new Date(a.paymentDate)
     );
 
-    // ✅ Apply pagination
+    // ✅ Pagination
     const totalPayments = allPayments.length;
     const startIndex = (page - 1) * limit;
     const paginatedPayments = allPayments.slice(startIndex, startIndex + limit);

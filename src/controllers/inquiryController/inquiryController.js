@@ -6,7 +6,7 @@ exports.createInquiry = async (req, res) => {
     const { name, mobile, address, class: className, center } = req.body;
 
     // Basic validation
-    if (!name || !mobile || !address || !className || !center) {
+    if (!name || !mobile  || !className) {
       return res.status(400).json({ message: "All fields are required." });
     }
 
