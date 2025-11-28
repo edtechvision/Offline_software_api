@@ -81,7 +81,7 @@ async function sendAdminWhatsapp(student, fee) {
 const payload = {
   apiKey:"6ad4--T4z4oQiWWfhyPUU5swiCi2NzYhj-rI9y3PMlTj0tMjRTQpVDVstxE9jcgB67J5bz5pm1NmsX6IkdFWb8J4qr6geaZM1vartk1B8Ryc",
     "campaignName": "NEW REGISTRATION",
-  destination: "918840480494", // admin number
+  destination: "917070852272", // admin number
   userName: "MSG24x7 Communications (DEMO)",
   templateParams: [
     safe(student.studentName),
