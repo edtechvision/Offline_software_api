@@ -52,38 +52,103 @@ const axios = require("axios");
 //     throw new Error("Failed to send WhatsApp message");
 //   }
 // }
+// async function sendAdmissionWhatsapp(student, receiptPath) {
+//   const safe = (v, fb = "N/A") => (v ? String(v) : fb);
+
+//   // ⭐ REQUIRED payload (as per official MSG24x7 documentation)
+//   const payload = {
+//     apiKey:
+//         "6ad4--T4z4oQiWWfhyPUU5swiCi2NzYhj-rI9y3PMlTj0tMjRTQpVDVstxE9jcgB67J5bz5pm1NmsX6IkdFWb8J4qr6geaZM1vartk1B8Ryc",
+
+//     campaignName: "ADMISSION STUDENTS SIDE",
+//     destination: safe(student.mobileNumber, "919999999999"),
+//     userName: safe(student.studentName, "Student"),
+//     source: safe(student.centerCode, "Imported"),
+
+//     // ⭐ MUST match template placeholder order
+//     templateParams: [
+//       safe(student.studentName, "Student"),      // {{1}}
+//       safe(student.admissionId, "N/A"),          // {{2}}
+//       safe(student.admissionDate, "N/A"),        // {{3}}
+//       safe(student.courseName, "N/A"),           // {{4}}
+//       safe(student.batchName, "N/A"),            // {{5}}
+//       safe(student.courseFee, "0"),              // {{6}}
+//       safe(student.collectedAmount, "0"),        // {{7}}
+//       safe(student.duesAmount, "0"),             // {{8}}
+//     ],
+
+//     // ⭐ MEDIA allowed by documentation
+//     media: {
+//       url: receiptPath || "https://yourcdn.com/default-receipt.pdf",
+//       filename: "Admission_Receipt.pdf"
+//     },
+
+//     // ⭐ Optional fields supported by docs
+//     tags: ["Admission"], // optional
+//     attributes: {
+//       FirstName: safe(student.studentName)
+//     }
+//   };
+
+//   try {
+//     const response = await axios.post(
+//       "https://apihub.msg24x7.com/getInteractedCustomerDetail/sendapicampaign",
+//       payload,
+//       { headers: { "Content-Type": "application/json" } }
+//     );
+
+//     console.log("✅ WhatsApp API Response:", response.data);
+//     return response.data;
+
+//   } catch (err) {
+//     if (err.response) {
+//       console.error("❌ WhatsApp API Error:", {
+//         status: err.response.status,
+//         statusText: err.response.statusText,
+//         data: err.response.data,
+//       });
+//     } else {
+//       console.error("❌ Request Error:", err.message);
+//     }
+//     throw new Error("Failed to send WhatsApp message");
+//   }
+// }
+
 async function sendAdmissionWhatsapp(student, receiptPath) {
   const safe = (v, fb = "N/A") => (v ? String(v) : fb);
 
-  // ⭐ REQUIRED payload (as per official MSG24x7 documentation)
-  const payload = {
-    apiKey: process.env.WHATSAPP_API_KEY,
+  // Ensure mobile number has country code +91
+  const destinationNumber = (() => {
+    const raw = safe(student.mobileNumber, "9999999999");
+    return raw.startsWith("91") ? raw : "91" + raw.replace(/^0+/, "");
+  })();
 
-    campaignName: "ADMISSION STUDENTS SIDE",
-    destination: safe(student.mobileNumber, "919999999999"),
+  // Payload according to MSG24x7 docs
+  const payload = {
+  apiKey:"6ad4--T4z4oQiWWfhyPUU5swiCi2NzYhj-rI9y3PMlTj0tMjRTQpVDVstxE9jcgB67J5bz5pm1NmsX6IkdFWb8J4qr6geaZM1vartk1B8Ryc",
+
+    campaignName: "ADMISSION STUDENTS SIDE ",
+    destination: destinationNumber,
     userName: safe(student.studentName, "Student"),
     source: safe(student.centerCode, "Imported"),
 
-    // ⭐ MUST match template placeholder order
     templateParams: [
-      safe(student.studentName, "Student"),      // {{1}}
-      safe(student.admissionId, "N/A"),          // {{2}}
-      safe(student.admissionDate, "N/A"),        // {{3}}
-      safe(student.courseName, "N/A"),           // {{4}}
-      safe(student.batchName, "N/A"),            // {{5}}
-      safe(student.courseFee, "0"),              // {{6}}
-      safe(student.collectedAmount, "0"),        // {{7}}
-      safe(student.duesAmount, "0"),             // {{8}}
+      safe(student.studentName, "Student"),
+      safe(student.admissionId, "N/A"),
+      safe(student.admissionDate, "N/A"),
+      safe(student.courseName, "N/A"),
+      safe(student.batchName, "N/A"),
+      safe(student.courseFee, "0"),
+      safe(student.collectedAmount, "0"),
+      safe(student.duesAmount, "0"),
     ],
 
-    // ⭐ MEDIA allowed by documentation
     media: {
       url: receiptPath || "https://yourcdn.com/default-receipt.pdf",
       filename: "Admission_Receipt.pdf"
     },
 
-    // ⭐ Optional fields supported by docs
-    tags: ["Admission"], // optional
+    tags: ["Admission"],
     attributes: {
       FirstName: safe(student.studentName)
     }
@@ -112,6 +177,5 @@ async function sendAdmissionWhatsapp(student, receiptPath) {
     throw new Error("Failed to send WhatsApp message");
   }
 }
-
 
 module.exports = { sendAdmissionWhatsapp };
