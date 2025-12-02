@@ -22,7 +22,7 @@ async function sendPaymentWhatsapp(fee, paymentEntry) {
     // ✅ Prepare WhatsApp payload
     const payload = {
       apiKey:
-        "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpZCI6IjY2Zjk1YzE2ZmRiMGIxMGI3OWMyNGExZiIsIm5hbWUiOiJUQVJHRVQgQk9BUkQiLCJhcHBOYW1lIjoiQWlTZW5zeSIsImNsaWVudElkIjoiNjZmOTVjMTZmZGIwYjEwYjc5YzI0YTE2IiwiYWN0aXZlUGxhbiI6Ik5PTkUiLCJpYXQiOjE3Mjc2MTgwNzB9.QzLBhqmZyhlLmWh6aIL5V40IWVxlLbSUL7g6bP7C8Ok",
+        "6ad4--T4z4oQiWWfhyPUU5swiCi2NzYhj-rI9y3PMlTj0tMjRTQpVDVstxE9jcgB67J5bz5pm1NmsX6IkdFWb8J4qr6geaZM1vartk1B8Ryc",
       campaignName: "dues_clear",
       destination: "7070852272",
       userName: "TARGET BOARD",
@@ -40,7 +40,8 @@ async function sendPaymentWhatsapp(fee, paymentEntry) {
 
     // ✅ Send WhatsApp message
     const response = await axios.post(
-      "https://backend.api-wa.co/campaign/digintra/api/v2",
+      // "https://backend.api-wa.co/campaign/digintra/api/v2",
+      "https://apihub.msg24x7.com/getInteractedCustomerDetail/sendapicampaign",
       payload,
       { headers: { "Content-Type": "application/json" } }
     );
