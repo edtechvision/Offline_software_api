@@ -23,7 +23,7 @@ async function sendPaymentWhatsapp(fee, paymentEntry) {
     const payload = {
       apiKey:
         "6ad4--T4z4oQiWWfhyPUU5swiCi2NzYhj-rI9y3PMlTj0tMjRTQpVDVstxE9jcgB67J5bz5pm1NmsX6IkdFWb8J4qr6geaZM1vartk1B8Ryc",
-      campaignName: "dues_clear",
+      campaignName: "Dues Student",
       destination: "7070852272",
       userName: "TARGET BOARD",
       templateParams: [
