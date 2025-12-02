@@ -55,36 +55,37 @@ const axios = require("axios");
 async function sendAdmissionWhatsapp(student, receiptPath) {
   const safe = (v, fb = "N/A") => (v ? String(v) : fb);
 
+  // ⭐ REQUIRED payload (as per official MSG24x7 documentation)
   const payload = {
-    apiKey: process.env.WHATSAPP_API_KEY, // move key to env
-  campaignName: "ADMISSION STUDENTS SIDE ",
+    apiKey: process.env.WHATSAPP_API_KEY,
+
+    campaignName: "ADMISSION STUDENTS SIDE",
     destination: safe(student.mobileNumber, "919999999999"),
     userName: safe(student.studentName, "Student"),
     source: safe(student.centerCode, "Imported"),
 
-    // ⬇ MUST MATCH TEMPLATE PLACEHOLDERS ORDER
+    // ⭐ MUST match template placeholder order
     templateParams: [
-      safe(student.studentName, "Student"),            // []
-      safe(student.admissionId, "N/A"),                // []
-      safe(student.admissionDate, "N/A"),              // []
-      safe(student.courseName, "N/A"),                 // []
-      safe(student.batchName, "N/A"),                  // []
-      safe(student.courseFee, "0"),                    // []
-      safe(student.collectedAmount, "0"),              // []
-      safe(student.duesAmount, "0"),                   // []
+      safe(student.studentName, "Student"),      // {{1}}
+      safe(student.admissionId, "N/A"),          // {{2}}
+      safe(student.admissionDate, "N/A"),        // {{3}}
+      safe(student.courseName, "N/A"),           // {{4}}
+      safe(student.batchName, "N/A"),            // {{5}}
+      safe(student.courseFee, "0"),              // {{6}}
+      safe(student.collectedAmount, "0"),        // {{7}}
+      safe(student.duesAmount, "0"),             // {{8}}
     ],
 
+    // ⭐ MEDIA allowed by documentation
     media: {
       url: receiptPath || "https://yourcdn.com/default-receipt.pdf",
       filename: "Admission_Receipt.pdf"
     },
 
-    buttons: [],
-    carouselCards: [],
-    location: {},
-    attributes: {},
-    paramsFallbackValue: {
-      FirstName: "user"
+    // ⭐ Optional fields supported by docs
+    tags: ["Admission"], // optional
+    attributes: {
+      FirstName: safe(student.studentName)
     }
   };
 
@@ -111,5 +112,6 @@ async function sendAdmissionWhatsapp(student, receiptPath) {
     throw new Error("Failed to send WhatsApp message");
   }
 }
+
 
 module.exports = { sendAdmissionWhatsapp };
